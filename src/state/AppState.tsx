@@ -38,6 +38,9 @@ interface AppState {
   /** Apply new information about one applicant, re-run, and report every decision that moved. */
   updateApplication: (uid: string, patch: Partial<Application>, sourceText: string) => UpdateOutcome;
   resetUpdates: () => void;
+  /** A question to pre-fill on the Ask page (set by 'Ask about this applicant'); the Ask page clears it once used. */
+  draftQuestion: string | null;
+  setDraftQuestion: (q: string | null) => void;
   resultByUid: (uid: string) => Result | undefined;
   findResult: (idOrName: string) => Result | undefined;
 }
@@ -76,6 +79,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [page, setPageState] = useState<Page>(pageFromHash);
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
+  const [draftQuestion, setDraftQuestion] = useState<string | null>(null);
   const ctxRef = useRef<EngineContext | null>(null);
 
   const parse = useMemo(() => (baseParse ? applyPatches(baseParse, patches) : null), [baseParse, patches]);
@@ -180,6 +184,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const value: AppState = {
     status, error, ctx, demandSource, parse, output, isSample, activity, page, setPage,
     selectedUid, openApplicant: setSelectedUid, loadFile, loadSample, updateApplication, resetUpdates, resultByUid, findResult,
+    draftQuestion, setDraftQuestion,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

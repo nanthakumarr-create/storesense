@@ -8,3 +8,5 @@ hubspot-app/node_modules
 scratch/
 *.log
 hubspot-app/.hsaccount
+tsconfig.tsbuildinfo
+*.tsbuildinfo
