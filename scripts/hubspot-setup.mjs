@@ -24,19 +24,23 @@ const CONTACT_PROPS = [
   ['ss_city', 'Store city', 'string', 'text'],
   ['ss_state', 'Store state', 'string', 'text'],
   ['ss_pin_code', 'Store pin code', 'string', 'text'],
-  ['ss_investment_lakh', 'Investment capacity (₹ lakh)', 'number', 'number'],
-  ['ss_retail_experience_years', 'Retail experience (years)', 'number', 'number'],
+  // Applicant answers are kept exactly as typed (e.g. "30 lakh"); StoreSense cleans them, not the CRM.
+  ['ss_investment_lakh', 'Investment capacity (₹ lakh)', 'string', 'text'],
+  ['ss_retail_experience_years', 'Retail experience (years)', 'string', 'text'],
   ['ss_current_business', 'Current / past business', 'string', 'textarea'],
   ['ss_space_available', 'Space available', 'enumeration', 'select', opts('Owned', 'Rented', 'Not yet identified')],
-  ['ss_space_size_sqft', 'Space size (sq ft)', 'number', 'number'],
+  ['ss_space_size_sqft', 'Space size (sq ft)', 'string', 'text'],
   ['ss_floor', 'Floor', 'enumeration', 'select', opts('Ground', 'Upper', 'Mall unit', 'Not known')],
-  ['ss_target_launch_months', 'Target launch (months)', 'number', 'number'],
+  ['ss_target_launch_months', 'Target launch (months)', 'string', 'text'],
+  ['ss_uid', 'StoreSense record key', 'string', 'text'],
+  ['ss_source_row', 'Source row', 'number', 'number'],
   ['ss_preferred_language', 'Training language (StoreSense)', 'string', 'text'],
   ['ss_notes', 'Notes from applicant', 'string', 'textarea'],
 ];
 
 const DEAL_PROPS = [
   ['ss_application_id', 'Application ID', 'string', 'text'],
+  ['ss_uid', 'StoreSense record key', 'string', 'text'],
   ['ss_decision', 'StoreSense decision', 'string', 'text'],
   ['ss_reason', 'Decision reason', 'string', 'textarea'],
   ['ss_next_step', 'StoreSense next step', 'string', 'textarea'],
@@ -65,8 +69,10 @@ async function ensureGroup(objectType) {
 
 async function ensureProps(objectType, props) {
   for (const [name, label, type, fieldType, options] of props) {
-    const r = await hs('POST', `/crm/v3/properties/${objectType}`, { name, label, type, fieldType, groupName: GROUP, ...(options ? { options } : {}) });
-    if (r.status !== 201 && r.status !== 409) console.log(`  ${objectType}.${name}: ${r.status} ${r.json.message}`);
+    let r = await hs('POST', `/crm/v3/properties/${objectType}`, { name, label, type, fieldType, groupName: GROUP, ...(options ? { options } : {}) });
+    // Already exists: bring its type in line (e.g. number → text for raw applicant answers)
+    if (r.status === 409 && !options) r = await hs('PATCH', `/crm/v3/properties/${objectType}/${name}`, { type, fieldType });
+    if (![200, 201, 409].includes(r.status)) console.log(`  ${objectType}.${name}: ${r.status} ${r.json.message}`);
   }
   console.log(`props ${objectType}: ${props.length} ensured`);
 }
