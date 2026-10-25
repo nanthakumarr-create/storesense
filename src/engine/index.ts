@@ -2,20 +2,20 @@
 // Contract: pure + deterministic. Same ParseResult + EngineContext → identical EngineOutput (including `hash`).
 // Decision order follows docs/rulebook.md P0-P8; every number comes from src/config/rules.ts.
 import type {
-  Application, City, Condition, DataFlag, Decision, EngineContext, EngineOutput, Floor, GapPin, ParseResult, PlaceInfo, Redirect,
-  Result, SpaceAvailable, Territory, TerritoryStatus, Tier,
+  Application, City, Condition, DataFlag, Decision, EngineContext, EngineOutput, Floor, GapPin, LaunchPlan, ParseResult, Partnership,
+  PlaceInfo, Redirect, Result, ScoreItem, SpaceAvailable, Territory, TerritoryStatus, Tier,
 } from '../types';
 import { DECISIONS } from '../types';
 import {
-  AS_OF_DATE, CITY_PIN_PREFIX, COMBINED_WEIGHTS, HOLD_SLOT_DAYS, MAX_CONDITIONS_FOR_APPROVAL, OVERLAP_RADIUS_KM, PARTNER_BAR,
-  PAYBACK_TARGET_MONTHS, SPACE_SQFT, ZERO_EXPERIENCE_MIN_SCORE,
+  AS_OF_DATE, BUFFER_MONTHS, CAPITAL_GAP, CITY_PIN_PREFIX, COMBINED_WEIGHTS, COMMITMENT, HOLD_SLOT_DAYS, MAX_CONDITIONS_FOR_APPROVAL, OVERLAP_RADIUS_KM,
+  PARTNER_BAR, PARTNER_WEIGHTS, PAYBACK_TARGET_MONTHS, SPACE_SQFT, TIER_ECONOMICS, ZERO_EXPERIENCE_MIN_SCORE,
 } from '../config/rules';
 import { haversineKm } from '../lib/geo';
 import { cityFromPin, demandIndexFor } from './demand';
 import { capitalBand, economicsFor, type CapitalBand } from './economics';
 import { buildLaunchPlan, festivalCheck, planDaysFor } from './launch';
 import { NOTE_PATTERNS } from './parse';
-import { partnerScore, type PartnerScore } from './partner';
+import { capitalFitPoints, partnerScore, type PartnerScore } from './partner';
 import { buildGeo, nearestStore, placeFor, placeScoreOf, territoryOrder, type Geo } from './place';
 import { addDays, fnv1a, km, lakh, prettyDate, round1, round2 } from './util';
 
@@ -381,6 +381,182 @@ function evaluate(app: Application, x: Ctx): Eval {
   return { ...eb, flags, asks, chatNote, holdSlot: false, bestCombined: eb.combined, codes: [...eb.codes, 'ASK_ATTACHED'] };
 }
 
+// ---------------------------------------------------------------- partnerships (pairs)
+/**
+ * PARTNERSHIPS: pair an INVESTOR (money, little or no retail experience) with an OPERATOR (experience, short of money)
+ * in the same territory, so the operator runs the store and the investor funds it. Deterministic, in four steps:
+ *
+ * 1. Pool (per territory, only territories with open slots): applicants whose pin is in the territory, excluding any Hold
+ *    (blocking data problems or missing facts), duplicate IDs, and anyone who already moves forward on their own
+ *    (Approve, Approve with conditions or Redirect in a dry run of the allocation without pairs).
+ * 2. Roles: INVESTOR = experience ≤ 1 year AND investment ≥ 40% of the tier's total cash need (investment + 3-month buffer).
+ *    OPERATOR = experience ≥ 3 years AND category relevance ≥ 70/100 (same or adjacent retail) AND a capital gap > 0.
+ * 3. A pair is valid when: the site is a free pin (the better of the two applicants' pins: one with a ready space first,
+ *    then the higher place score; never an existing store's pin), combined capacity ≥ the total cash need at that site,
+ *    payback at the site is within target, and the pair carries no more than MAX_CONDITIONS_FOR_APPROVAL conditions
+ *    (the partnership agreement counts as one). Joint partner score uses PARTNER_WEIGHTS: experience, relevance and
+ *    involvement from the operator (who runs the store full-time), commitment from the better space of the two (plus a
+ *    manager/co-investor named by either), capital fit from the combined capacity. Readiness comes from the site owner's
+ *    space, floor and timeline; combined score uses COMBINED_WEIGHTS.
+ * 4. Greedy matching per territory: rank valid pairs by combined score (tie-break operator ID, then investor ID),
+ *    take the best, remove both people, repeat. Each person is in at most one pair.
+ *
+ * Matched pairs then COMPETE for slots in allocation pass 1 alongside individuals (one pair = one slot, one pin).
+ * A pair that wins → both are "Approve with conditions" (partnership agreement within 30 days) and status "allocated".
+ * Otherwise the pair is "suggested": individual decisions stay, and both results say who the suggested partner is and
+ * where the pair would rank.
+ */
+export const PARTNERSHIP_RULES = {
+  investorMaxYears: 1,
+  investorMinShareOfNeed: 0.4,
+  operatorMinYears: 3,
+  operatorMinRelevance: 70,
+  /**
+   * Operator must be short by more than this share of the total cash need: a smaller gap is already handled by a
+   * loan-proof condition (CAPITAL_GAP.conditionMax), so a partner would only add a second owner for ₹1-2 L.
+   */
+  operatorMinGapShare: CAPITAL_GAP.conditionMax,
+  agreementDays: 30,
+  /**
+   * Points taken off a pair's combined score for partnership risk (two owners must agree; a split can close the store).
+   * Engine assumption, tune in the pilot. At 0 a pair's capital fit is always 100, so pairs took 12 of the sample's 21
+   * slots and pushed out stronger solo partners; at 5 a pair must clearly beat a solo applicant (7 of 21 on the sample).
+   */
+  combinedPenalty: 5,
+};
+
+interface PairCand {
+  id: string;
+  op: Eval;
+  inv: Eval;
+  owner: Eval; // the applicant whose pin is the site
+  territory: Territory;
+  place: ReturnType<typeof placeFor>;
+  sc: Scenario;
+  hasSite: boolean;
+  econFloor: Floor | null;
+  econ: ReturnType<typeof economicsFor>;
+  partner: PartnerScore;
+  readiness: number;
+  combined: number;
+  capacity: number;
+  investorFunds: number;
+  operatorGap: number;
+  conditions: Condition[];
+}
+
+/** Total cash need for a tier (standard investment + 3-month buffer, non-mall). */
+function tierNeed(tier: Tier): number {
+  const t = TIER_ECONOMICS[tier];
+  return t.investmentLakh + BUFFER_MONTHS * t.fixedCostLakh;
+}
+const relevanceScore = (e: Eval) => e.partner.items.find((i) => i.label === 'Category relevance')?.score ?? 0;
+const experienceScore = (e: Eval) => e.partner.items.find((i) => i.label === 'Experience')?.score ?? 0;
+const yearsText = (y: number) => (y === 0 ? 'no retail experience' : `${y} year${y === 1 ? '' : 's'} of retail experience`);
+
+function jointPartnerScore(op: Eval, inv: Eval, econ: ReturnType<typeof economicsFor>, capacity: number): PartnerScore {
+  const opItem = (label: string) => op.partner.items.find((i) => i.label === label)!;
+  const spaces = [op, inv].map((e) => ({ e, pts: COMMITMENT.spacePoints[e.sc.space ?? 'Not yet identified'] }));
+  spaces.sort((a, b) => b.pts - a.pts || a.e.app.id.localeCompare(b.e.app.id));
+  const bestSpace = spaces[0];
+  const mgrBy = [op, inv].filter((e) => e.partner.hasManagerOrCoInvestor).map((e) => e.app.id);
+  const commit = COMMITMENT.spaceWeight * bestSpace.pts + COMMITMENT.managerOrCoInvestorWeight * (mgrBy.length ? 100 : 0);
+  const cap = capitalFitPoints(capacity, econ.totalCashNeedLakh);
+  const exp = opItem('Experience');
+  const rel = opItem('Category relevance');
+  const inv2 = opItem('Owner involvement');
+  const items: ScoreItem[] = [
+    { label: 'Experience', weight: PARTNER_WEIGHTS.experience, score: exp.score, note: `${op.app.id} (runs the store): ${exp.note.charAt(0).toLowerCase()}${exp.note.slice(1)}` },
+    { label: 'Category relevance', weight: PARTNER_WEIGHTS.relevance, score: rel.score, note: `${op.app.id}: ${rel.note}` },
+    {
+      label: 'Commitment',
+      weight: PARTNER_WEIGHTS.commitment,
+      score: round2(commit),
+      note: `Best space of the two: ${bestSpace.e.sc.space ?? 'not given'} (${bestSpace.e.app.id}, ${bestSpace.pts}); ${mgrBy.length ? `manager / co-investor named by ${mgrBy.join(' and ')}` : 'no manager or co-investor named'}`,
+    },
+    {
+      label: 'Capital fit',
+      weight: PARTNER_WEIGHTS.capitalFit,
+      score: cap,
+      note: `₹${round2(capacity)} L combined (${op.app.id} ₹${op.app.investmentLakh} L + ${inv.app.id} ₹${inv.app.investmentLakh} L) vs ₹${econ.totalCashNeedLakh} L total cash need`,
+    },
+    { label: 'Owner involvement', weight: PARTNER_WEIGHTS.involvement, score: inv2.score, note: `${op.app.id}: ${inv2.note}` },
+  ];
+  const score = round2(items.reduce((s, i) => s + i.weight * i.score, 0));
+  return { score, items, relevance: op.partner.relevance, involvement: op.partner.involvement, hasManagerOrCoInvestor: mgrBy.length > 0 };
+}
+
+function buildPair(op: Eval, inv: Eval, t: Territory, geo: Geo): PairCand | null {
+  const sites = [op, inv].filter((e) => e.place.pin && e.place.territoryId === t.id && !geo.storePins.has(e.place.pin) && !e.place.samePinAsStore);
+  if (!sites.length) return null;
+  sites.sort(
+    (a, b) =>
+      Number(b.hasSite) - Number(a.hasSite) || b.place.placeScore - a.place.placeScore || a.place.pin!.localeCompare(b.place.pin!) || (a === op ? -1 : 1),
+  );
+  const owner = sites[0];
+  const capacity = round2((op.app.investmentLakh ?? 0) + (inv.app.investmentLakh ?? 0));
+  const econ = economicsFor(owner.place.tier, owner.place.demandIndex, owner.econFloor, capacity);
+  if (econ.capitalGapLakh > 0 || !econ.paybackPass) return null;
+  const partner = jointPartnerScore(op, inv, econ, capacity);
+  const combined = round2(combinedOf(partner.score, owner.place.placeScore, owner.readiness) - PARTNERSHIP_RULES.combinedPenalty);
+  const opCap = op.app.investmentLakh ?? 0;
+  const investorFunds = round2(Math.max(0, econ.totalCashNeedLakh - opCap));
+  const statics = staticConditions({ ...owner.app, investmentLakh: capacity }, owner.sc, owner.hasSite, owner.place, econ, 'pass', false, {
+    chatAssumed: chatSpaceAssumption(owner.app),
+    sitePinLabel: pinLbl(owner.place),
+  });
+  const agreement: Condition = {
+    code: 'PARTNERSHIP_AGREEMENT',
+    text: `Sign a partnership agreement within ${PARTNERSHIP_RULES.agreementDays} days: ${op.app.id} runs the store day to day, ${inv.app.id} funds ${lakh(investorFunds)} (${op.app.id} puts in ${lakh(Math.min(opCap, econ.totalCashNeedLakh))}).`,
+    deadlineDays: PARTNERSHIP_RULES.agreementDays,
+    owner: 'Both partners + Legal',
+  };
+  const conditions = [agreement, ...statics];
+  if (conditions.length > MAX_CONDITIONS_FOR_APPROVAL) return null;
+  return {
+    id: `PAIR-${op.app.id}+${inv.app.id}`,
+    op, inv, owner, territory: t, place: owner.place, sc: owner.sc, hasSite: owner.hasSite, econFloor: owner.econFloor, econ, partner,
+    readiness: owner.readiness, combined, capacity, investorFunds, operatorGap: round2(Math.max(0, econ.totalCashNeedLakh - opCap)), conditions,
+  };
+}
+
+function matchPartnerships(evals: Eval[], forwardAlone: Set<string>, geo: Geo, territories: Territory[]): PairCand[] {
+  const out: PairCand[] = [];
+  const R = PARTNERSHIP_RULES;
+  for (const t of [...territories].sort(territoryOrder)) {
+    if (t.openSlots <= 0) continue;
+    const pool = evals.filter(
+      (e) =>
+        e.place.territoryId === t.id &&
+        e.status !== 'hold' &&
+        !e.flags.some((f) => f.severity === 'block' || f.code === 'DUPLICATE_ID') &&
+        !forwardAlone.has(e.app.uid) &&
+        e.app.investmentLakh !== null &&
+        e.app.experienceYears !== null,
+    );
+    const investors = pool.filter((e) => e.app.experienceYears! <= R.investorMaxYears && e.app.investmentLakh! >= R.investorMinShareOfNeed * tierNeed(e.place.tier));
+    const operators = pool.filter((e) => e.app.experienceYears! >= R.operatorMinYears && relevanceScore(e) >= R.operatorMinRelevance && e.econ.capitalGapLakh > 0 && e.econ.capitalGapPct > R.operatorMinGapShare);
+    const valid: PairCand[] = [];
+    for (const op of operators) for (const inv of investors) {
+      const p = buildPair(op, inv, t, geo);
+      if (p) valid.push(p);
+    }
+    valid.sort(
+      (a, b) =>
+        b.combined - a.combined || a.op.app.id.localeCompare(b.op.app.id) || a.inv.app.id.localeCompare(b.inv.app.id) ||
+        a.op.app.rowNumber - b.op.app.rowNumber || a.inv.app.rowNumber - b.inv.app.rowNumber,
+    );
+    const used = new Set<string>();
+    for (const p of valid) {
+      if (used.has(p.op.app.uid) || used.has(p.inv.app.uid)) continue;
+      used.add(p.op.app.uid);
+      used.add(p.inv.app.uid);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------- allocation (P7) + output
 interface Final {
   decision: Decision;
@@ -388,8 +564,9 @@ interface Final {
   slotNote: string | null;
   redirect: (Redirect & { econ: ReturnType<typeof economicsFor>; conditions: Condition[] }) | null;
   extraConditions: Condition[];
-  winners?: string[];
+  winners?: string[]; // uids, or "pair:<id>" for a pair
   noOffer?: string | null; // why no redirect could be offered
+  pair?: string; // set when the applicant won the slot as part of this partnership
 }
 
 function tieBreak(a: Eval, b: Eval, key: (e: Eval) => number = (e) => e.combined): number {
@@ -403,22 +580,37 @@ function tieBreak(a: Eval, b: Eval, key: (e: Eval) => number = (e) => e.combined
   );
 }
 
-export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
-  const geo = buildGeo(ctx, parse.stores, parse.territories);
-  const x: Ctx = { geo };
-  const evals = parse.applications.map((a) => evaluate(a, x));
-  const byUid = new Map(evals.map((e) => [e.app.uid, e]));
-  const terrById = new Map(parse.territories.map((t) => [t.id, t]));
+/** A contender for a territory's slots: one applicant, or a matched pair. */
+type Cand = { e: Eval; p?: undefined } | { p: PairCand; e?: undefined };
+function candKey(c: Cand) {
+  return c.p
+    ? { key: c.p.combined, partner: c.p.partner.score, inv: c.p.capacity, exp: c.p.op.app.experienceYears ?? 0, id: c.p.op.app.id, row: c.p.op.app.rowNumber, sub: c.p.inv.app.id }
+    : { key: c.e.status === 'hold' ? c.e.bestCombined : c.e.combined, partner: c.e.partner.score, inv: c.e.app.investmentLakh ?? 0, exp: c.e.app.experienceYears ?? 0, id: c.e.app.id, row: c.e.app.rowNumber, sub: '' };
+}
+/** Same order as tieBreak for individuals; a pair ties after its operator, then by investor ID. */
+function cmpCand(a: Cand, b: Cand): number {
+  const x = candKey(a);
+  const y = candKey(b);
+  return y.key - x.key || y.partner - x.partner || y.inv - x.inv || y.exp - x.exp || x.id.localeCompare(y.id) || x.row - y.row || x.sub.localeCompare(y.sub);
+}
+const slotContender = (e: Eval) => e.status === 'eligible' || (e.status === 'hold' && e.holdSlot);
+
+interface Allocation {
+  finals: Map<string, Final>;
+  reserved: Map<string, string>;
+  pairWon: Set<string>;
+  pairSkip: Map<string, string>; // pair id → why it did not get a slot although it ranked high enough
+}
+
+function allocate(parse: ParseResult, geo: Geo, evals: Eval[], byUid: Map<string, Eval>, pairs: PairCand[]): Allocation {
   const slotsLeft = new Map(parse.territories.map((t) => [t.id, t.openSlots]));
   const reserved = new Map<string, string>(); // pin → uid
   const reservedPts: { pin: string; uid: string; lat: number; lng: number; tier: Tier }[] = [];
   const finals = new Map<string, Final>();
   const redirectPool: Eval[] = [];
-
-  for (const e of evals) {
-    if (e.place.pin && geo.multiTerritoryPins.has(e.place.pin))
-      e.flags = [...e.flags, { code: 'PIN_IN_TWO_TERRITORIES', severity: 'info', message: `Pin ${e.place.pin} is listed in ${geo.multiTerritoryPins.get(e.place.pin)!.join(' and ')}; used ${e.place.territoryId} (higher priority).`, field: 'pin' }];
-  }
+  const pairWon = new Set<string>();
+  const pairSkip = new Map<string, string>();
+  const pairById = new Map(pairs.map((p) => [p.id, p]));
 
   const reserve = (e: Eval, pin: string, tier: Tier) => {
     reserved.set(pin, e.app.uid);
@@ -502,16 +694,54 @@ export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
       winners: prev?.winners,
     });
   };
+  /** Holds a slot or a pin already (so cannot also join a pair). */
+  const hasSlot = (uid: string) => {
+    const d = finals.get(uid)?.decision;
+    return d === 'Approve' || d === 'Approve with conditions' || d === 'Redirect' || d === 'Hold';
+  };
 
-  // Pass 1: direct applicants, territory by territory (priority, then ID).
+  // Pass 1: direct applicants and matched pairs, territory by territory (priority, then ID).
   // A same-pin clash loser is offered another free pin in the same territory straight away, in rank order,
   // so a lower-ranked applicant never takes the slot ahead of them.
   for (const t of terrSorted) {
-    const cands = evals
-      .filter((e) => e.place.territoryId === t.id && (e.status === 'eligible' || (e.status === 'hold' && e.holdSlot)))
-      .sort((a, b) => tieBreak(a, b, (e) => (e.status === 'hold' ? e.bestCombined : e.combined)));
+    const cands: Cand[] = [
+      ...evals.filter((e) => e.place.territoryId === t.id && slotContender(e)).map((e) => ({ e })),
+      ...pairs.filter((p) => p.territory.id === t.id).map((p) => ({ p })),
+    ].sort(cmpCand);
     const winners: string[] = [];
-    for (const e of cands) {
+    for (const c of cands) {
+      if (c.p) {
+        const p = c.p;
+        const pin = p.place.pin!;
+        const taken = [p.op, p.inv].filter((m) => hasSlot(m.app.uid));
+        if (taken.length) {
+          pairSkip.set(p.id, `${taken.map((m) => m.app.id).join(' and ')} already won a slot on their own`);
+          continue;
+        }
+        if ((slotsLeft.get(t.id) ?? 0) <= 0) continue; // ranked below the slot winners
+        if (reserved.has(pin)) {
+          pairSkip.set(p.id, `the site pin ${pin} went to ${byUid.get(reserved.get(pin)!)?.app.id ?? 'another applicant'}`);
+          continue;
+        }
+        const extra: Condition[] = [];
+        const near = nearReserved(pin, p.place.tier);
+        if (near && !p.conditions.some((x) => x.code === 'CATCHMENT_CHECK')) {
+          const other = byUid.get(near.uid)!;
+          extra.push({ code: 'CATCHMENT_CHECK', text: `Catchment check: ${km(near.km)} from ${other.app.id}'s new store at ${near.pin} (overlap radius ${OVERLAP_RADIUS_KM[p.place.tier]} km). Confirm the two stores won't share customers.`, deadlineDays: 21, owner: 'Expansion manager' });
+        }
+        if (p.conditions.length + extra.length > MAX_CONDITIONS_FOR_APPROVAL) {
+          pairSkip.set(p.id, `a store approved ${km(near!.km)} away adds a catchment check, which makes too many conditions`);
+          continue;
+        }
+        reserve(p.op, pin, p.place.tier);
+        slotsLeft.set(t.id, (slotsLeft.get(t.id) ?? 0) - 1);
+        winners.push(`pair:${p.id}`);
+        pairWon.add(p.id);
+        for (const m of [p.op, p.inv]) finals.set(m.app.uid, { decision: 'Approve with conditions', codes: ['PAIR_SLOT_WON'], slotNote: null, redirect: null, extraConditions: extra, pair: p.id });
+        continue;
+      }
+      const e = c.e;
+      if (finals.get(e.app.uid)?.pair) continue; // already approved as part of a pair
       const pin = e.place.pin!;
       if (t.openSlots === 0) {
         if (e.status !== 'hold') finals.set(e.app.uid, { decision: 'Waitlist', codes: ['ZERO_SLOTS'], slotNote: `${t.id} has 0 open slots right now.`, redirect: null, extraConditions: [] });
@@ -526,7 +756,9 @@ export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
       if (reserved.has(pin)) {
         if (e.status === 'hold') continue;
         const holder = byUid.get(reserved.get(pin)!)!;
-        const lost: Final = { decision: 'Waitlist', codes: ['PIN_TAKEN_IN_RUN'], slotNote: `Pin ${pin} went to ${holder.app.id} (combined score ${holder.combined} vs ${e.combined}).`, redirect: null, extraConditions: [] };
+        const holderPair = finals.get(holder.app.uid)?.pair;
+        const holderScore = holderPair ? (pairById.get(holderPair)?.combined ?? holder.combined) : holder.combined;
+        const lost: Final = { decision: 'Waitlist', codes: ['PIN_TAKEN_IN_RUN'], slotNote: `Pin ${pin} went to ${holderPair ? `the ${pairById.get(holderPair)!.op.app.id} + ${pairById.get(holderPair)!.inv.app.id} partnership` : holder.app.id} (combined score ${holderScore} vs ${e.combined}).`, redirect: null, extraConditions: [] };
         const { best } = findRedirect(e, t.id);
         if (best) {
           applyRedirect(e, best, lost);
@@ -559,20 +791,24 @@ export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
         finals.set(e.app.uid, { decision: n === 0 ? 'Approve' : 'Approve with conditions', codes: ['SLOT_WON'], slotNote: null, redirect: null, extraConditions: extra });
       }
     }
-    for (const uid of winners) {
-      const f = finals.get(uid);
-      if (f) f.winners = winners;
+    for (const w of winners) {
+      const uids = w.startsWith('pair:') ? [pairById.get(w.slice(5))!.op.app.uid, pairById.get(w.slice(5))!.inv.app.uid] : [w];
+      for (const uid of uids) {
+        const f = finals.get(uid);
+        if (f) f.winners = winners;
+      }
     }
   }
   for (const e of evals) {
-    if (e.status === 'blocked' || e.status === 'paybackFail') redirectPool.push(e);
+    if ((e.status === 'blocked' || e.status === 'paybackFail') && !finals.get(e.app.uid)?.pair) redirectPool.push(e);
   }
 
   // Pass 2: redirects to free pins in territories with free slots (same city).
   // Ordered by partner score: the place score at the applicant's own pin (0 on a store pin) says nothing about the pin offered.
   redirectPool.sort((a, b) => tieBreak(a, b, (e) => e.partner.score));
   for (const e of redirectPool) {
-    if (finals.get(e.app.uid)?.decision === 'Redirect') continue;
+    const cur = finals.get(e.app.uid);
+    if (cur?.decision === 'Redirect' || cur?.pair) continue;
     const { best, alt, tooMany, why, whyShort } = findRedirect(e);
     const prev = finals.get(e.app.uid);
     if (best) {
@@ -594,39 +830,173 @@ export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
       prev.noOffer = why;
     }
   }
+  return { finals, reserved, pairWon, pairSkip };
+}
 
-  // ranks within territory (direct applicants, by combined score)
+/** What buildResult needs to know about an applicant's partnership. */
+interface PairView {
+  p: PairCand;
+  role: 'operator' | 'investor';
+  other: Eval;
+  partnership: Partnership;
+  launchPlan: LaunchPlan | null;
+}
+
+function pairOutcome(p: PairCand, allocated: boolean, rank: number | null, skip: string | undefined): string {
+  const t = p.territory;
+  if (allocated)
+    return `Approved as a pair in ${t.id}: ${p.op.app.id} runs the store at ${pinLbl(p.place)}, ${p.inv.app.id} funds ${lakh(p.investorFunds)}; payback ${round1(p.econ.paybackMonths ?? 0)} months.`;
+  const r = rank ?? 0;
+  const line =
+    skip ? `enough for a slot on score, but ${skip}`
+    : r <= t.openSlots ? 'enough for a slot on score'
+    : `${r - t.openSlots === 1 ? 'first' : ordinal(r - t.openSlots)} in line for the next slot`;
+  return `Suggested pair: would rank ${r} in ${t.id} (${t.openSlots} slot${t.openSlots === 1 ? '' : 's'}) with combined score ${p.combined}, ${line}.`;
+}
+
+function pairCovers(p: PairCand): string[] {
+  const { op, inv, econ } = p;
+  const opYears = op.app.experienceYears ?? 0;
+  const invYears = inv.app.experienceYears ?? 0;
+  const biz = op.app.currentBusiness.trim();
+  const out = [
+    `${op.app.id} brings ${opYears} years of retail experience${biz ? ` (${biz})` : ''}: experience ${experienceScore(op)}/100, category relevance ${relevanceScore(op)}/100. ${op.app.id} runs the store day to day.`,
+    `${inv.app.id} brings ${lakh(inv.app.investmentLakh ?? 0)}, closing ${op.app.id}'s ${lakh(p.operatorGap)} funding gap: together ${lakh(p.capacity)} vs ${lakh(econ.totalCashNeedLakh)} total cash need (${lakh(econ.requiredInvestmentLakh)} investment + ${lakh(econ.bufferLakh)} 3-month buffer).`,
+    `${inv.app.id} has ${yearsText(invYears)}, so on their own they would need a hired store manager; with ${op.app.id} running the store, that gap is covered.`,
+  ];
+  const size = p.sc.size !== null ? `, ${p.sc.size} sq ft` : '';
+  out.push(
+    p.hasSite
+      ? `Site: ${p.owner.app.id}'s ${String(p.sc.space).toLowerCase()} ${String(p.sc.floor ?? 'Not known').toLowerCase()}-floor space at ${pinLbl(p.place)}${size}; place score ${p.place.placeScore}, sales ${lakh(econ.monthlySalesLakh)}/month, payback ${round1(econ.paybackMonths ?? 0)} months (target ≤ ${PAYBACK_TARGET_MONTHS}).`
+      : `Site: none yet; find a ground-floor site in or near ${pinLbl(p.place)} (place score ${p.place.placeScore}); ground-floor sales ${lakh(econ.monthlySalesLakh)}/month, payback ${round1(econ.paybackMonths ?? 0)} months (target ≤ ${PAYBACK_TARGET_MONTHS}).`,
+  );
+  return out;
+}
+
+export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
+  const geo = buildGeo(ctx, parse.stores, parse.territories);
+  const x: Ctx = { geo };
+  const evals = parse.applications.map((a) => evaluate(a, x));
+  const byUid = new Map(evals.map((e) => [e.app.uid, e]));
+  const terrById = new Map(parse.territories.map((t) => [t.id, t]));
+
+  for (const e of evals) {
+    if (e.place.pin && geo.multiTerritoryPins.has(e.place.pin))
+      e.flags = [...e.flags, { code: 'PIN_IN_TWO_TERRITORIES', severity: 'info', message: `Pin ${e.place.pin} is listed in ${geo.multiTerritoryPins.get(e.place.pin)!.join(' and ')}; used ${e.place.territoryId} (higher priority).`, field: 'pin' }];
+  }
+
+  // Who moves forward on their own is not offered a partner. Start from a dry run without pairs; when pairs then take
+  // the slot of someone who was "forward alone", that person becomes pairable and the match re-runs. The excluded set
+  // only shrinks, so this ends (deterministically) in at most one pass per applicant.
+  const forwardSolo = (fs: Map<string, Final>) =>
+    new Set([...fs].filter(([, f]) => !f.pair && (f.decision === 'Approve' || f.decision === 'Approve with conditions' || f.decision === 'Redirect')).map(([uid]) => uid));
+  let forwardAlone = forwardSolo(allocate(parse, geo, evals, byUid, []).finals);
+  let pairs = matchPartnerships(evals, forwardAlone, geo, parse.territories);
+  let alloc = allocate(parse, geo, evals, byUid, pairs);
+  for (let i = 0; i < evals.length; i++) {
+    const still = forwardSolo(alloc.finals);
+    const next = new Set([...forwardAlone].filter((u) => still.has(u)));
+    if (next.size === forwardAlone.size) break;
+    forwardAlone = next;
+    pairs = matchPartnerships(evals, forwardAlone, geo, parse.territories);
+    alloc = allocate(parse, geo, evals, byUid, pairs);
+  }
+  const { finals, reserved, pairWon, pairSkip } = alloc;
+
+  // Ranks within territory among the contenders for its slots (eligible applicants, held applicants with a winnable
+  // best case, and pairs that took a slot), so "ranked 2" always means 2nd for the slots. A suggested pair gets the
+  // rank it would have among those contenders.
   const rank = new Map<string, number>();
-  // Rank only among the applicants who competed for a slot here (eligible, or held with a winnable best case),
-  // so "ranked 2" always means 2nd for the slots, not behind declined applicants with higher scores.
+  const pairRank = new Map<string, number>();
   for (const t of parse.territories) {
-    evals
-      .filter((e) => e.place.territoryId === t.id && (e.status === 'eligible' || (e.status === 'hold' && e.holdSlot)))
-      .sort((a, b) => tieBreak(a, b, (x) => (x.status === 'hold' ? x.bestCombined : x.combined)))
-      .forEach((e, i) => rank.set(e.app.uid, i + 1));
+    const list: Cand[] = [
+      ...evals.filter((e) => e.place.territoryId === t.id && slotContender(e)).map((e): Cand => ({ e })),
+      ...pairs.filter((p) => p.territory.id === t.id && pairWon.has(p.id)).map((p): Cand => ({ p })),
+    ].sort(cmpCand);
+    list.forEach((c, i) => (c.p ? pairRank.set(c.p.id, i + 1) : rank.set(c.e.app.uid, i + 1)));
+    for (const p of pairs.filter((q) => q.territory.id === t.id && !pairWon.has(q.id))) {
+      // members of the pair are not counted against it
+      const ahead = list.filter((c) => (c.p || (c.e.app.uid !== p.op.app.uid && c.e.app.uid !== p.inv.app.uid)) && cmpCand(c, { p }) < 0).length;
+      pairRank.set(p.id, ahead + 1);
+    }
+  }
+
+  // Partnerships output + per-applicant view
+  const partnerships: Partnership[] = [];
+  const pairViews = new Map<string, PairView>();
+  for (const p of pairs) {
+    const allocated = pairWon.has(p.id);
+    const r = pairRank.get(p.id) ?? null;
+    const partnership: Partnership = {
+      id: p.id,
+      operatorUid: p.op.app.uid,
+      operatorAppId: p.op.app.id,
+      operatorName: p.op.app.name,
+      investorUid: p.inv.app.uid,
+      investorAppId: p.inv.app.id,
+      investorName: p.inv.app.name,
+      territoryId: p.territory.id,
+      pin: p.place.pin!,
+      pinName: p.place.pinName,
+      combinedInvestmentLakh: p.capacity,
+      totalCashNeedLakh: p.econ.totalCashNeedLakh,
+      partnerScore: p.partner.score,
+      breakdown: p.partner.items,
+      placeScore: p.place.placeScore,
+      paybackMonths: p.econ.paybackMonths,
+      combinedScore: p.combined,
+      rankInTerritory: r,
+      covers: pairCovers(p),
+      status: allocated ? 'allocated' : 'suggested',
+      outcome: pairOutcome(p, allocated, r, pairSkip.get(p.id)),
+    };
+    partnerships.push(partnership);
+    for (const role of ['operator', 'investor'] as const) {
+      const me = role === 'operator' ? p.op : p.inv;
+      const other = role === 'operator' ? p.inv : p.op;
+      let launchPlan: LaunchPlan | null = null;
+      if (allocated) {
+        launchPlan = buildLaunchPlan({
+          app: p.op.app, hasSite: p.hasSite, floor: p.sc.floor, sizeSqft: p.sc.size, zeroExperience: false, partner: p.partner,
+          sitePinLabel: pinLbl(p.place), shadowStore: shadowStoreFor(p.owner, geo), capitalCondition: false,
+        });
+        launchPlan.training.splice(
+          1, 0,
+          `${p.op.app.id} (operator) does the full training and runs the store; ${p.inv.app.id} (investor) attends the brand induction day and the monthly P&L review.`,
+        );
+      }
+      pairViews.set(me.app.uid, { p, role, other, partnership, launchPlan });
+    }
   }
 
   // ---------------------------------------------------------------- build results
-  const results: Result[] = evals.map((e) => buildResult(e, finals.get(e.app.uid), terrById, geo, rank, byUid, finals));
+  const results: Result[] = evals.map((e) => buildResult(e, finals.get(e.app.uid), terrById, geo, rank, byUid, finals, pairViews));
 
   // territories
-  const territories: TerritoryStatus[] = terrSorted.map((t) => territoryStatus(t, results, geo));
+  const territories: TerritoryStatus[] = [...parse.territories].sort(territoryOrder).map((t) => territoryStatus(t, results, geo, partnerships));
 
   // gaps
-  const gaps = buildGaps(parse, results, geo, ctx, reserved);
+  const gaps = buildGaps(parse, results, geo, ctx, reserved, partnerships);
 
   // summary
   const byDecision = Object.fromEntries(DECISIONS.map((d) => [d, 0])) as Record<Decision, number>;
   for (const r of results) byDecision[r.decision]++;
   const taken: string[] = [...parse.stores.map((s) => s.pin)];
   for (const r of results) {
+    if (r.partnership?.status === 'allocated') {
+      // a pair opens one store, at the partnership's site
+      if (r.partnership.role === 'operator') taken.push(partnerships.find((p) => p.id === r.partnership!.id)!.pin);
+      continue;
+    }
     if (r.decision === 'Approve' || r.decision === 'Approve with conditions') taken.push(r.pin ?? '');
     if (r.decision === 'Redirect' && r.redirect) taken.push(r.redirect.pin);
   }
   const pinConflicts = taken.length - new Set(taken).size;
   const hash = fnv1a(
-    results
-      .map((r) => `${r.uid}:${r.decision}:${r.redirect?.pin ?? ''}:${r.combinedScore}`)
+    [
+      ...results.map((r) => `${r.uid}:${r.decision}:${r.redirect?.pin ?? ''}:${r.combinedScore}:${r.partnership ? `${r.partnership.id}/${r.partnership.status}` : ''}`),
+      ...partnerships.map((p) => `${p.id}:${p.status}:${p.pin}:${p.combinedScore}:${p.rankInTerritory ?? ''}`),
+    ]
       .sort()
       .join('|'),
   );
@@ -634,6 +1004,7 @@ export function runAll(parse: ParseResult, ctx: EngineContext): EngineOutput {
     results,
     territories,
     gaps,
+    partnerships,
     summary: {
       total: results.length,
       byDecision,
@@ -660,17 +1031,19 @@ const CONDITION_TITLE: Record<string, string> = {
   CATCHMENT_CHECK: 'catchment check signed off',
   LOCATION_UNVERIFIED: 'site location verified',
   CONFIRM_LEASE: 'lease papers and exact size sent',
+  PARTNERSHIP_AGREEMENT: 'partnership agreement signed (who runs the store, who funds what)',
 };
 /** Lower-case the first letter of a sentence fragment unless it starts with a code or name (e.g. "TER-15", "ST-02"). */
 const lc = (s: string) => (/^[A-Z][a-z]/.test(s) && !/^(Diwali|Sankranti)/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
 
-function partnerLine(e: Eval): string {
-  const top = [...e.partner.items].sort((a, b) => b.score * b.weight - a.score * a.weight);
-  const band = e.partner.score >= PARTNER_BAR.strong ? 'strong' : e.partner.score >= PARTNER_BAR.conditional ? 'conditional' : 'below the bar';
-  return `Partner score ${e.partner.score}/100 (${band}): ${top
+function partnerLine(ps: PartnerScore, joint = false): string {
+  const top = [...ps.items].sort((a, b) => b.score * b.weight - a.score * a.weight);
+  const band = ps.score >= PARTNER_BAR.strong ? 'strong' : ps.score >= PARTNER_BAR.conditional ? 'conditional' : 'below the bar';
+  const note = ps.items[0].note;
+  return `${joint ? 'Joint partner score' : 'Partner score'} ${ps.score}/100 (${band}): ${top
     .slice(0, 3)
     .map((i) => `${i.label.toLowerCase()} ${i.score}`)
-    .join(', ')}; ${e.partner.items[0].note.toLowerCase()}.`;
+    .join(', ')}; ${joint ? note : note.toLowerCase()}.`;
 }
 function placeLine(p: PlaceInfo): string {
   const loc = pinLbl(p);
@@ -679,11 +1052,10 @@ function placeLine(p: PlaceInfo): string {
   const near = p.nearestStore ? (p.samePinAsStore ? `same pin as ${p.samePinAsStore}` : `${km(p.nearestStore.km)} from ${p.nearestStore.id} ${p.nearestStore.area}`) : 'no store nearby';
   return `Place ${loc}: ${near}${p.insideOverlapRadius ? ` (inside the ${p.overlapRadiusKm} km overlap radius)` : ''}; ${dem}; place score ${p.placeScore}.`;
 }
-function moneyLine(e: Eval): string {
-  const ec = e.econ;
+function moneyLine(ec: Eval['econ'], capacity: number | null, floor: Floor | null, hasSite: boolean, capLabel = 'available'): string {
   const pb = ec.paybackMonths === null ? 'no profit, so no payback' : `payback ${round1(ec.paybackMonths)} months (target ≤ ${PAYBACK_TARGET_MONTHS})`;
-  const cap = e.app.investmentLakh === null ? 'investment not given' : `${lakh(e.app.investmentLakh)} available vs ${lakh(ec.totalCashNeedLakh)} needed${ec.capitalGapLakh > 0 ? ` (${lakh(ec.capitalGapLakh)} short)` : ''}`;
-  return `Money (${ec.tier}, ${e.econFloor ?? 'Not known'} floor${e.hasSite ? '' : ' assumed, no site yet'}): sales ${lakh(ec.monthlySalesLakh)}/month, profit ${lakh(ec.monthlyProfitLakh)}/month, ${pb}; ${cap}.`;
+  const cap = capacity === null ? 'investment not given' : `${lakh(capacity)} ${capLabel} vs ${lakh(ec.totalCashNeedLakh)} needed${ec.capitalGapLakh > 0 ? ` (${lakh(ec.capitalGapLakh)} short)` : ''}`;
+  return `Money (${ec.tier}, ${floor ?? 'Not known'} floor${hasSite ? '' : ' assumed, no site yet'}): sales ${lakh(ec.monthlySalesLakh)}/month, profit ${lakh(ec.monthlyProfitLakh)}/month, ${pb}; ${cap}.`;
 }
 
 function buildResult(
@@ -694,8 +1066,11 @@ function buildResult(
   rank: Map<string, number>,
   byUid: Map<string, Eval>,
   finals: Map<string, Final>,
+  pairViews: Map<string, PairView>,
 ): Result {
   const app = e.app;
+  const pv = pairViews.get(app.uid) ?? null;
+  const pairApproved = !!pv && f?.pair === pv.p.id;
   const terr = e.place.territoryId ? terrById.get(e.place.territoryId) : undefined;
   let decision: Decision;
   let headline: string;
@@ -708,14 +1083,49 @@ function buildResult(
   const lang = app.preferredLanguage ?? 'English';
   const due = (d: number) => prettyDate(addDays(d));
   const winnersText = (ids?: string[]) =>
-    (ids ?? []).map((u) => byUid.get(u)).filter(Boolean).map((w) => `${w!.app.id} (${w!.combined})`).join(', ');
+    (ids ?? [])
+      .map((u) => {
+        if (u.startsWith('pair:')) {
+          const p = [...pairViews.values()].find((v) => v.p.id === u.slice(5))?.p;
+          return p ? `${p.op.app.id} + ${p.inv.app.id} as a pair (${p.combined})` : null;
+        }
+        const w = byUid.get(u);
+        return w ? `${w.app.id} (${w.combined})` : null;
+      })
+      .filter(Boolean)
+      .join(', ');
 
   if (e.chatNote) {
     reasons.push(e.chatNote);
     codes.push('UPDATED_FROM_CHAT');
   }
 
-  if (e.status === 'hold') {
+  if (pv && pairApproved) {
+    // Won a slot as a pair: operator runs the store, investor funds it.
+    const p = pv.p;
+    const other = pv.other.app;
+    conditions = [...p.conditions, ...(f?.extraConditions ?? [])];
+    decision = 'Approve with conditions';
+    codes.push('PARTNERSHIP', pv.role === 'operator' ? 'PARTNERSHIP_OPERATOR' : 'PARTNERSHIP_INVESTOR', ...(f?.codes ?? []), ...conditions.map((c) => c.code));
+    const pb = round1(p.econ.paybackMonths ?? 0);
+    headline =
+      pv.role === 'operator'
+        ? `Approve with conditions, as a pair with ${other.id}: ${app.id} runs the store at ${pinLbl(p.place)}, ${other.id} funds ${lakh(p.investorFunds)}; joint partner score ${p.partner.score}, payback ${pb} months.`
+        : `Approve with conditions, as a pair with ${other.id}: ${app.id} funds ${lakh(p.investorFunds)}, ${other.id} runs the store at ${pinLbl(p.place)}; joint partner score ${p.partner.score}, payback ${pb} months.`;
+    reasons.push(
+      `Won a slot in ${p.territory.id} (${p.territory.priority} priority, ${p.territory.openSlots} slot${p.territory.openSlots === 1 ? '' : 's'}) as a pair: ranked ${pv.partnership.rankInTerritory} with combined score ${p.combined}.`,
+    );
+    if (e.why.length) reasons.push(`On their own: ${lc(e.why[0])}`);
+    reasons.push(...pv.partnership.covers);
+    nextSteps.push(
+      `Introduce ${p.op.app.id} and ${p.inv.app.id} and send the joint approval in ${lang} by ${due(2)}.`,
+      `KYC, CIBIL check for both partners and the franchise agreement by ${due(7)}.`,
+    );
+    for (const c of conditions) nextSteps.push(`${c.owner}: ${CONDITION_TITLE[c.code] ?? c.code.toLowerCase().replace(/_/g, ' ')} by ${due(c.deadlineDays)}.`);
+    whatWouldChange.push(
+      `If the partnership agreement is not signed by ${due(PARTNERSHIP_RULES.agreementDays)}, the slot goes to the next in line (${nextInLine(p.op, byUid, finals) ?? 'none waiting'}) and both return to their own decisions.`,
+    );
+  } else if (e.status === 'hold') {
     decision = 'Hold';
     codes.push(...e.codes, ...(f?.codes ?? []));
     reasons.push(...e.why);
@@ -825,14 +1235,38 @@ function buildResult(
     }
   }
 
+  // suggested partnership (did not win a slot as a pair): individual decision stays, the pairing is stated plainly
+  if (pv && !pairApproved && (decision === 'Waitlist' || decision === 'Decline')) {
+    const o = pv.other.app;
+    const oYears = o.experienceYears ?? 0;
+    const who =
+      pv.role === 'operator'
+        ? `${lakh(o.investmentLakh ?? 0)}, ${yearsText(oYears)}`
+        : `${yearsText(oYears)}${o.currentBusiness.trim() ? ` (${o.currentBusiness.trim()})` : ''}, ${lakh(o.investmentLakh ?? 0)}`;
+    const rest = pv.partnership.outcome.replace(/^Suggested pair: would /, '');
+    reasons.push(`Suggested partner: ${o.id} ${o.name} (${who}). As a pair you would ${rest}`);
+    codes.push('PARTNERSHIP_SUGGESTED');
+    whatWouldChange.push(
+      pv.role === 'operator'
+        ? `Partnering with ${o.id}: ${o.id} funds ${lakh(pv.p.investorFunds)} and ${app.id} runs the store at ${pinLbl(pv.p.place)} (joint partner score ${pv.p.partner.score}, payback ${round1(pv.p.econ.paybackMonths ?? 0)} months).`
+        : `Partnering with ${o.id}: ${o.id} runs the store at ${pinLbl(pv.p.place)} and ${app.id} funds ${lakh(pv.p.investorFunds)} (joint partner score ${pv.p.partner.score}, payback ${round1(pv.p.econ.paybackMonths ?? 0)} months).`,
+    );
+    nextSteps.push(`Introduce ${pv.p.op.app.id} and ${pv.p.inv.app.id} by ${due(7)} to discuss a partnership; the pair is first considered when a ${pv.p.territory.id} slot opens.`);
+  }
+
   // always show the three numbers lines
-  reasons.push(partnerLine(e), placeLine(e.place), moneyLine(e));
+  if (pv && pairApproved) reasons.push(partnerLine(pv.p.partner, true), placeLine(stripPlace(pv.p.place)), moneyLine(pv.p.econ, pv.p.capacity, pv.p.econFloor, pv.p.hasSite, 'combined'));
+  else reasons.push(partnerLine(e.partner), placeLine(e.place), moneyLine(e.econ, e.app.investmentLakh, e.econFloor, e.hasSite));
   for (const fl of e.flags) if (fl.severity === 'info' && fl.code.endsWith('PARSED_FROM_TEXT')) reasons.push(`Note: ${fl.message}`);
 
   // preparation + launch plan
   let launchPlan: Result['launchPlan'] = null;
   const shadow = shadowStoreFor(e, geo);
-  if (decision === 'Approve' || decision === 'Approve with conditions') {
+  if (pv && pairApproved && pv.launchPlan) {
+    launchPlan = pv.launchPlan;
+    if (launchPlan.festivalNote) reasons.push(launchPlan.festivalNote);
+    nextSteps.push(`Target opening ${prettyDate(launchPlan.targetOpenDate)} (${launchPlan.totalDays}-day plan).`);
+  } else if (decision === 'Approve' || decision === 'Approve with conditions') {
     launchPlan = buildLaunchPlan({
       app, hasSite: e.hasSite, floor: e.sc.floor, sizeSqft: e.sc.size, zeroExperience: e.zeroExp, partner: e.partner,
       sitePinLabel: pinLbl(e.place), shadowStore: shadow, capitalCondition: conditions.some((c) => c.code.startsWith('CAPITAL') || c.code === 'BUFFER_SHORT'),
@@ -845,8 +1279,13 @@ function buildResult(
     : prepFor(e, decision, shadow, lang);
 
   const asks = e.asks;
+  // An approved pair shows the joint numbers (joint partner score, the site's place and P&L with combined capacity).
+  const jp = pv && pairApproved ? pv.p : null;
   return {
     uid: app.uid,
+    partnership: pv
+      ? { id: pv.p.id, role: pv.role, withUid: pv.other.app.uid, withAppId: pv.other.app.id, withName: pv.other.app.name, status: pv.partnership.status }
+      : null,
     appId: app.id,
     name: app.name,
     city: String(app.city),
@@ -860,14 +1299,14 @@ function buildResult(
     whatWouldChange,
     asks,
     conditions,
-    partnerScore: e.partner.score,
-    partnerBreakdown: e.partner.items,
-    place: stripPlace(e.place),
-    economics: e.econ,
-    readiness: e.readiness,
-    combinedScore: e.combined,
+    partnerScore: jp ? jp.partner.score : e.partner.score,
+    partnerBreakdown: jp ? jp.partner.items : e.partner.items,
+    place: stripPlace(jp ? jp.place : e.place),
+    economics: jp ? jp.econ : e.econ,
+    readiness: jp ? jp.readiness : e.readiness,
+    combinedScore: jp ? jp.combined : e.combined,
     territoryId: e.place.territoryId,
-    rankInTerritory: rank.get(app.uid) ?? null,
+    rankInTerritory: jp ? (pv!.partnership.rankInTerritory ?? null) : (rank.get(app.uid) ?? null),
     redirect,
     launchPlan,
     flags: e.flags,
@@ -926,17 +1365,30 @@ function prepFor(e: Eval, d: Decision, shadow: { id: string; area: string; km: n
 }
 
 // ---------------------------------------------------------------- territories + gaps
-function territoryStatus(t: Territory, results: Result[], geo: Geo): TerritoryStatus {
+function territoryStatus(t: Territory, results: Result[], geo: Geo, partnerships: Partnership[]): TerritoryStatus {
   const inT = results.filter((r) => r.territoryId === t.id);
+  const pairById = new Map(partnerships.map((p) => [p.id, p]));
+  const pairMembers = new Set<string>(); // investors of allocated pairs: the pair is listed once, under the operator's uid
   const filled = results
     .filter(
       (r) =>
         (r.territoryId === t.id && (r.decision === 'Approve' || r.decision === 'Approve with conditions' || (r.decision === 'Hold' && r.reasonCodes.includes('SLOT_HELD')))) ||
         (r.decision === 'Redirect' && r.redirect?.territoryId === t.id),
     )
-    .map((r) => ({ uid: r.uid, appId: r.appId, name: r.name, pin: r.decision === 'Redirect' ? r.redirect!.pin : (r.pin ?? ''), decision: r.decision, combinedScore: r.combinedScore }))
+    .filter((r) => {
+      if (r.partnership?.status === 'allocated' && r.partnership.role === 'investor') {
+        pairMembers.add(r.uid);
+        return false;
+      }
+      return true;
+    })
+    .map((r) => {
+      const p = r.partnership?.status === 'allocated' ? pairById.get(r.partnership.id) : undefined;
+      if (p) return { uid: r.uid, appId: `${p.operatorAppId} + ${p.investorAppId}`, name: `${p.operatorName} + ${p.investorName}`, pin: p.pin, decision: r.decision, combinedScore: r.combinedScore };
+      return { uid: r.uid, appId: r.appId, name: r.name, pin: r.decision === 'Redirect' ? r.redirect!.pin : (r.pin ?? ''), decision: r.decision, combinedScore: r.combinedScore };
+    })
     .sort((a, b) => b.combinedScore - a.combinedScore || a.appId.localeCompare(b.appId));
-  const filledSet = new Set(filled.map((f) => f.uid));
+  const filledSet = new Set([...filled.map((f) => f.uid), ...pairMembers]);
   const contenders = inT
     .filter((r) => !filledSet.has(r.uid))
     .sort((a, b) => b.combinedScore - a.combinedScore || a.appId.localeCompare(b.appId))
@@ -958,7 +1410,7 @@ function territoryStatus(t: Territory, results: Result[], geo: Geo): TerritorySt
       : r.reasonCodes.includes('PAYBACK_FAIL') ? `because ${r.pin} fails payback`
       : 'after losing the slot at their own pin';
     const won = filled.filter((f) => f.decision !== 'Redirect');
-    const parts = won.map((f) => `${f.appId} (${f.combinedScore}${f.decision === 'Hold' ? ', slot held' : ''})`);
+    const parts = won.map((f) => `${f.appId}${f.appId.includes(' + ') ? ' as a pair' : ''} (${f.combinedScore}${f.decision === 'Hold' ? ', slot held' : ''})`);
     const moved = filled
       .filter((f) => f.decision === 'Redirect')
       .map((f) => {
@@ -976,10 +1428,13 @@ function territoryStatus(t: Territory, results: Result[], geo: Geo): TerritorySt
   return { id: t.id, city: String(t.city), tier: t.tier, priority: t.priority, openSlots: t.openSlots, filled, contenders, reason, suggestRaisePriority };
 }
 
-function buildGaps(parse: ParseResult, results: Result[], geo: Geo, ctx: EngineContext, reserved: Map<string, string>): GapPin[] {
+function buildGaps(parse: ParseResult, results: Result[], geo: Geo, ctx: EngineContext, reserved: Map<string, string>, partnerships: Partnership[]): GapPin[] {
   const applicantsByPin = new Map<string, number>();
   for (const a of parse.applications) if (a.pin) applicantsByPin.set(a.pin, (applicantsByPin.get(a.pin) ?? 0) + 1);
-  const approvedByPin = new Set(results.filter((r) => r.decision === 'Approve' || r.decision === 'Approve with conditions').map((r) => r.pin));
+  const approvedByPin = new Set(
+    results.filter((r) => (r.decision === 'Approve' || r.decision === 'Approve with conditions') && r.partnership?.status !== 'allocated').map((r) => r.pin),
+  );
+  for (const p of partnerships) if (p.status === 'allocated') approvedByPin.add(p.pin);
   const pins = new Set<string>([...ctx.pins.map((p) => p.pin), ...parse.territories.flatMap((t) => t.pins)]);
   const out: (GapPin & { score: number })[] = [];
   for (const pin of pins) {

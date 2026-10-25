@@ -30,10 +30,13 @@ export type Intent =
   | { kind: 'compare'; a: string; b: string }
   | { kind: 'territory'; terId: string }
   | { kind: 'gaps'; city?: City }
+  | { kind: 'partnerships'; appId?: string; terId?: string }
   | { kind: 'ambiguous'; query: string; candidates: string[] }
   | { kind: 'unknownId'; appId: string }
   | { kind: 'help' }
   | { kind: 'unknown'; text: string };
+
+const PARTNERSHIP_RE = /\bpartnerships?\b|\bpair(s|ed|ing|ings)?\b|\bteam(ed|ing)? up\b|\bjoint stores?\b|money (and|but) no experience/;
 
 export interface NameRef {
   id: string;
@@ -399,6 +402,12 @@ export function parseIntent(text: string, knownIds: string[], names: NameRef[] =
   const isQuestion = /^\s*(why|explain|what|how|tell|show|is|was|did|does|can|who|which|list|compare)\b/.test(t) && !/^\s*what if\b/.test(t);
 
   if (/^\s*(help|hi|hello|hey|\?|what can you do|commands)\b/.test(t)) return { kind: 'help' };
+
+  // Partnerships: "who could partner with APP-038", "partnerships in TER-02", "show partnerships".
+  // A statement like "APP-038 found a business partner with 10 lakh" is an update, not this.
+  if (PARTNERSHIP_RE.test(t) || (isQuestion && /\bpartner(s|ed)?\b/.test(t) && !/co-?\s?investor|business partner/.test(t))) {
+    return { kind: 'partnerships', appId: ids[0], terId: terId ?? undefined };
+  }
 
   // Two applicants → compare
   if (ids.length >= 2) return { kind: 'compare', a: ids[0], b: ids[1] };

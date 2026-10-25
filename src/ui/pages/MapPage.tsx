@@ -1,434 +1,651 @@
-// Demand map: the "place" half of every decision. Where demand is, where stores are, where applicants want to open, where the gaps are.
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AlertTriangle, Crosshair, Info, Layers as LayersIcon, MapPin, Store, Target, Users } from 'lucide-react';
+// Store network map: where orders come from today, where we lose them, and what a new store would change.
+// One mode at a time on a light basemap; click a store or pin to isolate it. Bengaluru has simulated order data.
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useApp } from '../../state/AppState';
-import { DECISIONS, type City, type Decision, type PinInfo, type Result } from '../../types';
+import type { City, PinInfo, Result } from '../../types';
 import { CITY_TIER, OVERLAP_RADIUS_KM } from '../../config/rules';
-import { demandIndexFor } from '../../engine/demand';
+import { demandIndexFor, cityFromPin } from '../../engine/demand';
 import { haversineKm } from '../../lib/geo';
+import { storeSiteOf } from '../../lib/site';
 import { EXISTING_STORES } from '../../data/existingStores';
-import { Button, Card, CardHeader, DECISION_STYLE, EmptyState, PageHeader, Pill, Spinner, cx, fmtInt, fmtKm } from '../components/ui';
-import { DemandMap, type Layers, type MapStore, type PinStat } from '../map/DemandMap';
-import { CITIES, DEMAND_BINS, demandColor, demandLabel, loadPinShapes, type PinShapes } from '../map/mapData';
+import { PINS, PIN_BY_CODE } from '../../data/loaders';
+import { Button, Card, DECISION_STYLE, PageHeader, Spinner, cx, fmtInt } from '../components/ui';
+import { NetworkMap, type MapCircle, type MapLine, type PinPaint, type PointMarker, type StoreMarker } from '../map/NetworkMap';
+import {
+  BestPlaces,
+  ImpactPanel,
+  LeaksPanel,
+  NetworkPanel,
+  OtherCityPanel,
+  PanelSection,
+  PinTrafficPanel,
+  StorePanel,
+  type StoreShift,
+} from '../map/MapPanels';
+import {
+  CITIES,
+  DEMAND_INDEX_SCALE,
+  FLOW_COLOR,
+  HEAVY_LIFTER_PCT,
+  LEAK_SCALE,
+  OPPORTUNITY_SCALE,
+  POTENTIAL_BY_PIN,
+  TRAFFIC_SCALE,
+  flowWeight,
+  jitter,
+  loadFlows,
+  loadPinShapes,
+  offsetSegment,
+  scaleColor,
+  storeArea,
+  type FlowData,
+  type PinShapes,
+  type Scale,
+} from '../map/mapData';
 
-const LAYER_LABELS: { key: keyof Layers; label: string; swatch: ReactNode }[] = [
-  { key: 'demand', label: 'Demand', swatch: <span className="h-2.5 w-2.5 rounded-sm bg-gradient-to-br from-[#93d7cc] to-[#0b524c]" /> },
-  { key: 'stores', label: 'Stores + radius', swatch: <span className="h-2.5 w-2.5 rounded-sm bg-slate-900" /> },
-  { key: 'catchments', label: 'Catchments', swatch: <span className="h-2.5 w-2.5 rounded-full border-2 border-dashed border-orange-700" /> },
-  { key: 'applicants', label: 'Applicants', swatch: <span className="h-2.5 w-2.5 rounded-full bg-sky-700" /> },
-  { key: 'redirects', label: 'Redirects', swatch: <span className="h-0.5 w-3 border-t-2 border-dashed border-violet-600" /> },
+type Mode = 'traffic' | 'leaks' | 'plan';
+
+const MODES: { id: Mode; label: string; what: string }[] = [
+  { id: 'traffic', label: "Today's traffic", what: 'Where store orders come from today and which stores are near capacity. Click a store to isolate it.' },
+  { id: 'leaks', label: 'Leaks', what: 'Where we lose orders because no store is close. Click a pin to see where its customers go instead.' },
+  { id: 'plan', label: 'Plan a new store', what: 'Click any pin to see what a new store there would win, take from our stores, and earn.' },
 ];
 
-const isApproved = (d: Decision) => d === 'Approve' || d === 'Approve with conditions';
-
-function resultCity(r: Result, pinCity: (pin: string) => string | undefined): string {
-  return (r.pin && pinCity(r.pin)) || r.city;
-}
+const FEED_SCALE: Scale = { stops: [0, 3, 6, 12, 20, 35, 60], colors: TRAFFIC_SCALE.colors };
+const DIM: Pick<PinPaint, 'fill' | 'opacity'> = { fill: '#e5e7eb', opacity: 0.12 };
+const isApproved = (r: Result) => r.decision === 'Approve' || r.decision === 'Approve with conditions';
+const ll = (p: { lat: number; lng: number }): [number, number] => [p.lat, p.lng];
 
 export function MapPage() {
-  const { output, parse, ctx, openApplicant, demandSource } = useApp();
+  const { output, parse, ctx, routeParam, openApplicant, page } = useApp();
   const [city, setCity] = useState<City>('Bengaluru');
+  const [mode, setMode] = useState<Mode>('traffic');
+  const [selStore, setSelStore] = useState<string | null>(null);
+  const [selPin, setSelPin] = useState<string | null>(null);
+  const [showApproved, setShowApproved] = useState(true);
   const [shapes, setShapes] = useState<PinShapes | null>(null);
-  const [shapeError, setShapeError] = useState<string | null>(null);
-  const [layers, setLayers] = useState<Layers>({ demand: true, stores: true, catchments: false, applicants: true, redirects: true });
-  const [decisionFilter, setDecisionFilter] = useState<Set<Decision>>(() => new Set(DECISIONS));
-  const [hoverPin, setHoverPin] = useState<string | null>(null);
-  const [selectedPin, setSelectedPin] = useState<string | null>(null);
-  const [focusPin, setFocusPin] = useState<{ pin: string; nonce: number } | null>(null);
+  const [flows, setFlows] = useState<FlowData | null>(null);
+  const [flowError, setFlowError] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ lat: number; lng: number; zoom: number; nonce: string } | null>(null);
+
+  const blr = city === 'Bengaluru';
 
   useEffect(() => {
-    let alive = true;
-    loadPinShapes()
-      .then((s) => alive && setShapes(s))
-      .catch((e) => alive && setShapeError(e instanceof Error ? e.message : String(e)));
-    return () => {
-      alive = false;
-    };
+    loadPinShapes().then(setShapes).catch(() => setShapes(null)); // dots fallback if boundaries fail
+  }, []);
+  const fetchFlows = useCallback(() => {
+    setFlowError(null);
+    loadFlows()
+      .then(setFlows)
+      .catch((e: unknown) => setFlowError(e instanceof Error ? e.message : String(e)));
+  }, []);
+  useEffect(fetchFlows, [fetchFlows]);
+
+  const flyTo = useCallback((pin: string, zoom = 12) => {
+    const p = PIN_BY_CODE[pin];
+    if (p) setFocus({ lat: p.lat, lng: p.lng, zoom, nonce: `${pin}-${Date.now()}` });
   }, []);
 
+  // Deep link: #/map/560010 → simulate a store there (Bengaluru) or focus the pin (other cities).
   useEffect(() => {
-    setSelectedPin(null);
-    setHoverPin(null);
-  }, [city]);
+    if (page !== 'map' || !routeParam || !/^\d{6}$/.test(routeParam)) return;
+    const c = cityFromPin(routeParam);
+    if (!c) return;
+    setCity(c);
+    setSelStore(null);
+    setSelPin(routeParam);
+    setMode(c === 'Bengaluru' ? 'plan' : 'traffic');
+    flyTo(routeParam, 12);
+  }, [routeParam, page, flyTo]);
 
-  const pinIndex = useMemo<Record<string, PinInfo>>(() => Object.fromEntries((ctx?.pins ?? []).map((p) => [p.pin, p])), [ctx]);
-  const cityPins = useMemo(() => (ctx?.pins ?? []).filter((p) => p.city === city), [ctx, city]);
-  const results = output?.results ?? [];
+  const cityPins = useMemo(() => PINS.filter((p) => p.city === city), [city]);
+  const pinName = useCallback((pin: string) => PIN_BY_CODE[pin]?.name ?? '', []);
+  const tier = CITY_TIER[city];
+  const overlapKm = OVERLAP_RADIUS_KM[tier];
 
-  const stores = useMemo<MapStore[]>(() => {
+  const cityStores = useMemo(() => {
     const list = parse?.stores?.length ? parse.stores : EXISTING_STORES;
-    return list.flatMap((s) => {
-      const c = ctx?.catchment.find((x) => x.store_id === s.id || x.pin === s.pin) ?? null;
-      const p = pinIndex[s.pin];
-      const pos = p ? { lat: p.lat, lng: p.lng } : c ? { lat: c.lat, lng: c.lng } : null;
-      if (!pos) return [];
-      const tier = CITY_TIER[s.city as City] ?? p?.tier ?? 'Tier 2';
-      return [{ ...s, ...pos, tier, catchment: c }];
-    });
-  }, [parse, ctx, pinIndex]);
+    return list
+      .filter((s) => s.city === city || cityFromPin(s.pin) === city)
+      .map((s) => {
+        const fs = flows?.stores.find((x) => x.id === s.id);
+        const p = PIN_BY_CODE[s.pin];
+        const pos = fs ? { lat: fs.lat, lng: fs.lng } : p ? { lat: p.lat, lng: p.lng } : null;
+        return pos ? { ...s, ...pos, flow: fs ?? null } : null;
+      })
+      .filter((s): s is NonNullable<typeof s> => s !== null);
+  }, [parse, city, flows]);
 
-  const applicantsByPin = useMemo(() => {
-    const m: Record<string, number> = {};
-    for (const r of results) if (r.pin) m[r.pin] = (m[r.pin] ?? 0) + 1;
-    return m;
-  }, [results]);
+  // One marker per approved store, at the pin where it will open (an allocated pair shares one site)
+  const approved = useMemo(() => {
+    if (!output) return [] as (Result & { site: string })[];
+    const seenPairs = new Set<string>();
+    return output.results
+      .filter((r) => isApproved(r))
+      .filter((r) => {
+        if (r.partnership?.status !== 'allocated') return true;
+        if (seenPairs.has(r.partnership.id)) return false;
+        seenPairs.add(r.partnership.id);
+        return true;
+      })
+      .map((r) => ({ ...r, site: storeSiteOf(r, output) ?? '' }))
+      .filter((r) => r.site && PIN_BY_CODE[r.site]?.city === city);
+  }, [output, city]);
 
-  const pinStats = useMemo<Record<string, PinStat>>(() => {
-    if (!ctx) return {};
-    const out: Record<string, PinStat> = {};
+  const candidate = blr && mode === 'plan' && selPin && flows ? flows.candidates[selPin] ?? null : null;
+  const pot = blr && mode === 'plan' && selPin ? POTENTIAL_BY_PIN[selPin] ?? null : null;
+
+  // Bengaluru opens zoomed on the store cluster so labels don't collide; other cities fit all their pins.
+  const fitTo = useMemo<[number, number][] | null>(() => (blr && cityStores.length > 1 ? cityStores.map(ll) : null), [blr, cityStores.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* ---------- pin shading ---------- */
+  const paint = useMemo<Record<string, PinPaint>>(() => {
+    const out: Record<string, PinPaint> = {};
     for (const p of cityPins) {
-      const d = demandIndexFor(p.pin, ctx);
-      let nearest: { id: string; km: number } | null = null;
-      for (const s of stores) {
-        const km = haversineKm(p, s);
-        if (!nearest || km < nearest.km) nearest = { id: s.id, km };
+      const name = `${p.pin} ${p.name}`;
+      const emphasis = p.pin === selPin;
+      if (!blr) {
+        const d = ctx ? demandIndexFor(p.pin, ctx).index : 0;
+        out[p.pin] = { fill: scaleColor(DEMAND_INDEX_SCALE, d), opacity: 0.6, emphasis, label: `${name} · demand proxy ${d}/100` };
+        continue;
       }
-      out[p.pin] = {
-        pin: p.pin,
-        name: p.name,
-        city: p.city,
-        demandIndex: d.index,
-        source: d.source,
-        onlineOrders: d.onlineOrders,
-        nearestStoreKm: nearest?.km ?? null,
-        nearestStoreId: nearest?.id ?? null,
-        applicants: applicantsByPin[p.pin] ?? 0,
-      };
+      if (!flows) {
+        out[p.pin] = { fill: '#f3f4f6', opacity: 0.4, label: name };
+        continue;
+      }
+      const fp = flows.pins[p.pin];
+      const pp = POTENTIAL_BY_PIN[p.pin];
+      if (mode === 'traffic') {
+        if (selStore) {
+          const v = flows.baseline.find((b) => b.pin === p.pin && b.store === selStore)?.perMonth ?? 0;
+          out[p.pin] = v > 0 ? { fill: scaleColor(FEED_SCALE, v), opacity: 0.75, label: `${name} · ${v} orders/mo to ${selStore}` } : { ...DIM, label: `${name} · no orders to ${selStore}` };
+        } else {
+          const v = fp ? fp.store + fp.online : 0;
+          out[p.pin] = {
+            fill: scaleColor(TRAFFIC_SCALE, v),
+            opacity: selPin && !emphasis ? 0.3 : 0.6,
+            emphasis,
+            label: fp ? `${name} · ${v} orders/mo (${fp.store} in store, ${fp.online} online)` : `${name} · no order data`,
+          };
+        }
+      } else if (mode === 'leaks') {
+        const v = pp?.missed_orders_month ?? 0;
+        out[p.pin] = {
+          fill: scaleColor(LEAK_SCALE, v),
+          opacity: selPin && !emphasis ? 0.35 : 0.72,
+          emphasis,
+          label: pp ? `${name} · ${v} missed orders/mo (₹${pp.missed_sales_lakh_month.toFixed(2)}L) · ${pp.redirected_orders_month} travel >4 km` : name,
+        };
+      } else if (candidate) {
+        const f = candidate.flows.find((x) => x.pin === p.pin);
+        const v = f ? f.takenPerMonth + f.newPerMonth : 0;
+        out[p.pin] = v > 0 || emphasis
+          ? { fill: scaleColor(FEED_SCALE, v), opacity: 0.75, emphasis, label: f ? `${name} · ${f.newPerMonth} new + ${f.takenPerMonth} from ${f.fromStore} per month` : name }
+          : { ...DIM, label: `${name} · not in this store's catchment` };
+      } else {
+        const existing = pp?.verdict === 'Existing store here';
+        const v = existing ? 0 : pp?.incremental_orders_month ?? 0;
+        out[p.pin] = {
+          fill: existing ? '#d1d5db' : scaleColor(OPPORTUNITY_SCALE, v),
+          opacity: 0.72,
+          emphasis,
+          label: !pp ? name : existing ? `${name} · existing store` : `${name} · +${v} new orders/mo · payback ${pp.payback_months ?? '—'} mo`,
+        };
+      }
     }
     return out;
-  }, [ctx, cityPins, stores, applicantsByPin]);
+  }, [cityPins, blr, ctx, flows, mode, selStore, selPin, candidate]);
 
-  const pinCity = (pin: string) => pinIndex[pin]?.city;
-  const cityResults = useMemo(() => results.filter((r) => resultCity(r, pinCity) === city), [results, city, pinIndex]); // eslint-disable-line react-hooks/exhaustive-deps
-  const cityStores = stores.filter((s) => s.city === city);
-  const cityTerritories = (output?.territories ?? []).filter((t) => t.city === city);
-  const slotsTotal = cityTerritories.reduce((a, t) => a + t.openSlots, 0);
-  const slotsFilled = cityTerritories.reduce((a, t) => a + t.filled.length, 0);
-  const approvedCount = cityResults.filter((r) => isApproved(r.decision)).length;
-  const byDecision = useMemo(() => {
-    const m = Object.fromEntries(DECISIONS.map((d) => [d, 0])) as Record<Decision, number>;
-    for (const r of cityResults) m[r.decision]++;
-    return m;
-  }, [cityResults]);
-  const offMap = cityResults.filter((r) => !r.pin || !pinIndex[r.pin]).length;
+  /* ---------- lines (only for the current selection, except a light leak overview) ---------- */
+  const lines = useMemo<MapLine[]>(() => {
+    if (!blr || !flows) return [];
+    const storePos = Object.fromEntries(flows.stores.map((s) => [s.id, ll(s)]));
+    const pinPos = (pin: string) => (PIN_BY_CODE[pin] ? ll(PIN_BY_CODE[pin]) : null);
+    const out: MapLine[] = [];
+    if (mode === 'traffic') {
+      const rows = selStore ? flows.baseline.filter((b) => b.store === selStore) : selPin ? flows.baseline.filter((b) => b.pin === selPin) : [];
+      for (const b of rows) {
+        const a = pinPos(b.pin);
+        if (!a || !storePos[b.store] || b.perMonth <= 0) continue;
+        out.push({ key: `t-${b.pin}-${b.store}`, positions: [a, storePos[b.store]], color: FLOW_COLOR.today, weight: flowWeight(b.perMonth), opacity: 0.5, tooltip: `${b.pin} ${pinName(b.pin)} → ${b.store}: ${b.perMonth} orders/mo` });
+      }
+    } else if (mode === 'leaks') {
+      const src = selPin ? [POTENTIAL_BY_PIN[selPin]].filter(Boolean) : Object.values(POTENTIAL_BY_PIN);
+      for (const p of src) {
+        for (const r of p.redirected_to) {
+          if (r.ordersPerMonth < (selPin ? 1 : 4) || !storePos[r.store]) continue;
+          out.push({
+            key: `l-${p.pin}-${r.store}`,
+            positions: [ll(p), storePos[r.store]],
+            color: FLOW_COLOR.redirect,
+            weight: selPin ? flowWeight(r.ordersPerMonth) + 1 : 1.2,
+            opacity: selPin ? 0.85 : 0.35,
+            tooltip: `${p.pin} ${p.name} → ${r.store}: ${r.ordersPerMonth} orders/mo travel more than 4 km`,
+          });
+        }
+      }
+    } else if (candidate && selPin && PIN_BY_CODE[selPin]) {
+      const target = ll(PIN_BY_CODE[selPin]);
+      const top = [...candidate.flows].sort((a, b) => b.takenPerMonth + b.newPerMonth - (a.takenPerMonth + a.newPerMonth)).slice(0, 30);
+      for (const f of top) {
+        const a = pinPos(f.pin);
+        if (!a || f.takenPerMonth + f.newPerMonth < 2 || f.pin === selPin) continue;
+        if (f.takenPerMonth >= 5 && storePos[f.fromStore]) {
+          out.push({ key: `o-${f.pin}`, positions: [a, storePos[f.fromStore]], color: FLOW_COLOR.oldRoute, weight: 1.5, opacity: 0.6, dash: '4 6', tooltip: `Today: ${f.pin} ${pinName(f.pin)} → ${f.fromStore}` });
+        }
+        const both = f.takenPerMonth > 0 && f.newPerMonth > 0;
+        if (f.takenPerMonth > 0) {
+          out.push({ key: `k-${f.pin}`, positions: both ? offsetSegment(a, target, 70) : [a, target], color: FLOW_COLOR.taken, weight: flowWeight(f.takenPerMonth), tooltip: `${f.pin} ${pinName(f.pin)}: ${f.takenPerMonth} orders/mo move from ${f.fromStore} to the new store` });
+        }
+        if (f.newPerMonth > 0) {
+          out.push({ key: `n-${f.pin}`, positions: both ? offsetSegment(a, target, -70) : [a, target], color: FLOW_COLOR.won, weight: flowWeight(f.newPerMonth), tooltip: `${f.pin} ${pinName(f.pin)}: ${f.newPerMonth} new orders/mo won back (online or missed today)` });
+        }
+      }
+    }
+    return out;
+  }, [blr, flows, mode, selStore, selPin, candidate, pinName]);
 
-  const gaps = useMemo(() => (output?.gaps ?? []).filter((g) => g.city === city).sort((a, b) => b.demandIndex - a.demandIndex), [output, city]);
+  /* ---------- circles: overlap radius + catchments ---------- */
+  const circles = useMemo<MapCircle[]>(() => {
+    const out: MapCircle[] = [];
+    const isolated = blr && mode === 'traffic' && selStore;
+    for (const s of cityStores) {
+      if (isolated && s.id !== selStore) continue;
+      const strong = isolated && s.id === selStore;
+      out.push({ key: `ov-${s.id}`, center: ll(s), radiusM: overlapKm * 1000, color: '#111827', fillOpacity: strong ? 0.08 : 0.04, dash: strong ? undefined : '2 4' });
+      if (strong) {
+        const c = ctx?.catchment.find((x) => x.store_id === s.id);
+        if (c) out.push({ key: `p80-${s.id}`, center: ll(s), radiusM: c.p80_customer_km * 1000, color: FLOW_COLOR.today, dash: '8 6' });
+      }
+    }
+    if (candidate && selPin && PIN_BY_CODE[selPin]) {
+      const c = ll(PIN_BY_CODE[selPin]);
+      out.push({ key: 'new-ov', center: c, radiusM: overlapKm * 1000, color: '#1d4ed8', fillOpacity: 0.1 });
+      out.push({ key: 'new-catch', center: c, radiusM: candidate.catchment_radius_km * 1000, color: '#1d4ed8', dash: '8 6' });
+    }
+    return out;
+  }, [cityStores, blr, mode, selStore, overlapKm, ctx, candidate, selPin]);
 
-  const activePin = hoverPin ?? selectedPin;
-  const active = activePin ? pinStats[activePin] : null;
-  const tier = CITY_TIER[city];
+  /* ---------- store markers ---------- */
+  const storeMarkers = useMemo<StoreMarker[]>(
+    () =>
+      cityStores.map((s) => {
+        const f = s.flow;
+        const area = storeArea(s.id, f?.area ?? s.city);
+        if (!f) {
+          return { id: s.id, lat: s.lat, lng: s.lng, pct: null, heavy: false, dimmed: false, selected: false, caption: s.id, tooltip: `${s.id} · pin ${s.pin} · opened ${s.opened} · no order data`, size: 20 };
+        }
+        const after = candidate ? candidate.store_load_after[s.id] : undefined;
+        const afterPct = after !== undefined ? Math.round((after / f.capacity_per_month) * 100) : null;
+        const changed = afterPct !== null && afterPct !== f.utilisation_pct;
+        const heavy = f.utilisation_pct >= HEAVY_LIFTER_PCT;
+        return {
+          id: s.id,
+          lat: s.lat,
+          lng: s.lng,
+          pct: changed ? afterPct : f.utilisation_pct,
+          heavy: changed ? (afterPct ?? 0) >= HEAVY_LIFTER_PCT : heavy,
+          dimmed: (mode === 'traffic' && !!selStore && selStore !== s.id) || (!!candidate && !changed),
+          selected: selStore === s.id,
+          caption: changed ? `${s.id} · ${f.utilisation_pct}→${afterPct}%` : `${s.id} · ${f.utilisation_pct}%`,
+          tooltip: `${s.id} ${area} · ${fmtInt(f.load_per_month)} orders/mo · ${f.utilisation_pct}% of capacity${heavy ? ' · heavy lifter' : ''}${changed ? ` · after new store: ${afterPct}%` : ''}`,
+          size: Math.round(22 + (f.load_per_month / f.capacity_per_month) * 16),
+        };
+      }),
+    [cityStores, candidate, mode, selStore],
+  );
 
-  const flyTo = (pin: string) => {
-    setSelectedPin(pin);
-    setFocusPin({ pin, nonce: Date.now() });
+  const points = useMemo<PointMarker[]>(
+    () =>
+      showApproved
+        ? approved.map((r) => {
+            const p = PIN_BY_CODE[r.site] as PinInfo;
+            const who = r.partnership?.status === 'allocated' ? `${r.appId} + ${r.partnership.withAppId} (pair)` : `${r.appId} ${r.name}`;
+            return {
+              key: r.uid,
+              pos: jitter(p.lat, p.lng, r.uid),
+              color: DECISION_STYLE[r.decision].hex,
+              radius: 6,
+              tooltip: `${who} · ${r.decision} · pin ${r.site}`,
+              onClick: () => openApplicant(r.uid),
+            };
+          })
+        : [],
+    [showApproved, approved, openApplicant],
+  );
+
+  /* ---------- interactions ---------- */
+  const changeMode = (m: Mode) => {
+    setMode(m);
+    setSelStore(null);
+    setSelPin(null);
   };
-  const toggleDecision = (d: Decision) =>
-    setDecisionFilter((prev) => {
-      const next = new Set(prev);
-      if (next.has(d)) next.delete(d);
-      else next.add(d);
-      return next;
-    });
+  const onPinClick = useCallback(
+    (pin: string) => {
+      setSelStore(null);
+      setSelPin((cur) => (cur === pin && mode !== 'plan' ? null : pin));
+    },
+    [mode],
+  );
+  const onStoreClick = useCallback(
+    (id: string) => {
+      if (!blr) return;
+      setMode('traffic');
+      setSelPin(null);
+      setSelStore((cur) => (cur === id ? null : id));
+    },
+    [blr],
+  );
+  const selectStoreFromList = (id: string) => {
+    setSelStore(id);
+    setSelPin(null);
+    const s = cityStores.find((x) => x.id === id);
+    if (s) setFocus({ lat: s.lat, lng: s.lng, zoom: 12, nonce: `${id}-${Date.now()}` });
+  };
+  const simulateAt = (pin: string) => {
+    setMode('plan');
+    setSelStore(null);
+    setSelPin(pin);
+    flyTo(pin, 12);
+  };
+  const pickPin = (pin: string | null) => {
+    setSelPin(pin);
+    if (pin) flyTo(pin, 13);
+  };
 
-  if (!ctx) {
-    return (
+  /* ---------- plan-mode data ---------- */
+  const shifts = useMemo<StoreShift[]>(() => {
+    if (!candidate || !flows) return [];
+    return flows.stores
+      .map((s) => ({ id: s.id, area: storeArea(s.id, s.area), before: s.load_per_month, after: candidate.store_load_after[s.id] ?? s.load_per_month, capacity: s.capacity_per_month }))
+      .sort((a, b) => b.before - b.after - (a.before - a.after) || a.id.localeCompare(b.id));
+  }, [candidate, flows]);
+
+  const planApplicants = useMemo(() => {
+    if (!selPin || !output) return { list: [] as Result[], territory: null as string | null, heldBy: null as string | null };
+    const terr = parse?.territories.find((t) => t.pins.includes(selPin)) ?? null;
+    const list = output.results
+      .filter((r) => r.pin === selPin || (terr && r.territoryId === terr.id))
+      .sort((a, b) => Number(b.pin === selPin) - Number(a.pin === selPin) || b.combinedScore - a.combinedScore)
+      .slice(0, 10);
+    const holder = output.results.find((r) => isApproved(r) && storeSiteOf(r, output) === selPin);
+    return {
+      list,
+      territory: terr ? `${terr.id} · ${terr.priority} priority · ${terr.openSlots} open slot${terr.openSlots === 1 ? '' : 's'}` : null,
+      heldBy: holder ? `${holder.appId} ${holder.name}` : null,
+    };
+  }, [selPin, output, parse]);
+
+  /* ---------- other-city data ---------- */
+  const otherCity = useMemo(() => {
+    if (blr || !ctx) return null;
+    const nearest = (p: PinInfo) => {
+      let best: { id: string; km: number } | null = null;
+      for (const s of cityStores) {
+        const km = haversineKm(p, s);
+        if (!best || km < best.km) best = { id: s.id, km };
+      }
+      return best;
+    };
+    const rows = cityPins.map((p) => ({ p, index: demandIndexFor(p.pin, ctx).index, near: nearest(p) }));
+    const topPins = [...rows]
+      .sort((a, b) => b.index - a.index || (b.near?.km ?? 99) - (a.near?.km ?? 99))
+      .slice(0, 8)
+      .map((r) => ({ pin: r.p.pin, name: r.p.name, index: r.index, nearestKm: r.near ? r.near.km : null }));
+    const sel = selPin ? rows.find((r) => r.p.pin === selPin) : null;
+    return {
+      topPins,
+      pinDetail: sel
+        ? { pin: sel.p.pin, name: sel.p.name, index: sel.index, nearestStore: sel.near?.id ?? null, nearestKm: sel.near?.km ?? null, applicants: (output?.results ?? []).filter((r) => r.pin === sel.p.pin) }
+        : null,
+    };
+  }, [blr, ctx, cityPins, cityStores, selPin, output]);
+
+  /* ---------- panel ---------- */
+  let panel: ReactNode;
+  if (!blr) {
+    panel = otherCity ? (
+      <OtherCityPanel
+        city={city}
+        stores={cityStores.map((s) => ({ id: s.id, pin: s.pin, opened: s.opened, overlapKm }))}
+        topPins={otherCity.topPins}
+        selectedPin={selPin}
+        pinDetail={otherCity.pinDetail}
+        approved={approved}
+        onPin={pickPin}
+        onOpenApplicant={openApplicant}
+      />
+    ) : (
+      <div className="p-6">
+        <Spinner label="Loading demand data…" />
+      </div>
+    );
+  } else if (flowError) {
+    panel = (
+      <PanelSection title="Could not load order flows">
+        <p className="text-sm text-muted">{flowError}</p>
+        <Button className="mt-3" onClick={fetchFlows}>
+          Try again
+        </Button>
+      </PanelSection>
+    );
+  } else if (!flows) {
+    panel = (
+      <div className="p-6">
+        <Spinner label="Loading order flows…" />
+      </div>
+    );
+  } else if (mode === 'traffic') {
+    panel = selStore ? (
+      <StorePanel
+        flows={flows}
+        storeId={selStore}
+        catchment={ctx?.catchment.find((c) => c.store_id === selStore) ?? null}
+        overlapKm={overlapKm}
+        pinName={pinName}
+        onBack={() => setSelStore(null)}
+        onPin={(pin) => {
+          setSelStore(null);
+          pickPin(pin);
+        }}
+      />
+    ) : selPin ? (
+      <PinTrafficPanel flows={flows} pin={selPin} pinName={pinName(selPin)} onBack={() => setSelPin(null)} onSimulate={() => simulateAt(selPin)} />
+    ) : (
+      <NetworkPanel flows={flows} selectStore={selectStoreFromList} />
+    );
+  } else if (mode === 'leaks') {
+    panel = <LeaksPanel flows={flows} selectedPin={selPin} onPin={pickPin} onSimulate={simulateAt} />;
+  } else {
+    panel = (
       <>
-        <PageHeader title="Demand map" />
-        <Card className="p-10">
-          <Spinner label="Loading pin and demand data…" />
-        </Card>
+        {selPin && pot ? (
+          <ImpactPanel
+            pot={pot}
+            radiusKm={candidate?.catchment_radius_km ?? null}
+            shifts={shifts}
+            applicants={planApplicants.list}
+            territoryLabel={planApplicants.territory}
+            heldBy={planApplicants.heldBy}
+            meta={flows.meta}
+            onOpenApplicant={openApplicant}
+            onClear={() => setSelPin(null)}
+          />
+        ) : selPin ? (
+          <PanelSection title={`${selPin} ${pinName(selPin)}`}>
+            <p className="text-sm text-muted">No order data for this pin, so a new store cannot be simulated here.</p>
+          </PanelSection>
+        ) : (
+          <PanelSection title="Pick a place">
+            <p className="text-sm text-ink">Click any pin on the map, or choose one of the best places below.</p>
+          </PanelSection>
+        )}
+        <BestPlaces selectedPin={selPin} onPick={simulateAt} />
       </>
     );
   }
 
+  const modeInfo = MODES.find((m) => m.id === mode)!;
+
   return (
     <div>
       <PageHeader
-        title="Demand map"
-        subtitle="Where customers are, where stores already serve them, and where applicants want to open."
+        title="Store network map"
+        subtitle="See where orders come from, where we lose them, and what a new franchise would change."
         actions={
-          <div className="flex items-center gap-2">
-            <label className="sr-only" htmlFor="map-city">
-              City
-            </label>
-            <select
-              id="map-city"
-              value={city}
-              onChange={(e) => setCity(e.target.value as City)}
-              className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-medium text-ink shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-500 md:hidden"
-            >
-              {CITIES.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value as City);
+              setSelPin(null);
+              setSelStore(null);
+            }}
+            className="rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink"
+            aria-label="City"
+          >
+            {CITIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
         }
       />
 
-      {/* City switcher (desktop) */}
-      <div className="mb-3 hidden flex-wrap gap-1.5 md:flex">
-        {CITIES.map((c) => {
-          const n = results.filter((r) => resultCity(r, pinCity) === c).length;
-          return (
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex w-full rounded-lg border border-line bg-white p-0.5 sm:w-auto" role="tablist">
+          {MODES.map((m) => (
             <button
-              key={c}
-              onClick={() => setCity(c)}
+              key={m.id}
+              role="tab"
+              aria-selected={mode === m.id}
+              disabled={!blr && m.id !== 'traffic'}
+              onClick={() => changeMode(m.id)}
               className={cx(
-                'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition-colors',
-                c === city ? 'border-brand-700 bg-brand-700 text-white' : 'border-line bg-white text-ink hover:bg-slate-50',
+                'flex-1 rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none',
+                mode === m.id ? 'bg-brand-700 font-medium text-white' : 'text-muted hover:text-ink',
               )}
             >
-              {c}
-              <span className={cx('tabular text-xs', c === city ? 'text-brand-100' : 'text-muted')}>{n}</span>
+              {m.label}
             </button>
-          );
-        })}
+          ))}
+        </div>
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input type="checkbox" checked={showApproved} onChange={(e) => setShowApproved(e.target.checked)} className="h-4 w-4 accent-brand-700" />
+          Show approved franchises ({approved.length})
+        </label>
       </div>
+      <p className="mb-3 text-sm text-ink">{blr ? modeInfo.what : `${city}: stores and a demand proxy only. Order data and traffic simulation cover Bengaluru.`}</p>
 
-      {/* Layer + decision filters */}
-      <Card className="mb-3 px-3 py-2.5">
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 inline-flex items-center gap-1 text-xs font-medium uppercase tracking-wide text-muted">
-              <LayersIcon size={13} /> Layers
-            </span>
-            {LAYER_LABELS.map((l) => (
-              <button
-                key={l.key}
-                onClick={() => setLayers((s) => ({ ...s, [l.key]: !s[l.key] }))}
-                aria-pressed={layers[l.key]}
-                className={cx(
-                  'inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
-                  layers[l.key] ? 'border-slate-300 bg-slate-100 text-ink' : 'border-line bg-white text-muted line-through decoration-slate-300',
-                )}
-              >
-                {l.swatch}
-                {l.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-xs font-medium uppercase tracking-wide text-muted">Show</span>
-            {DECISIONS.map((d) => {
-              const on = decisionFilter.has(d);
-              const st = DECISION_STYLE[d];
-              return (
-                <button
-                  key={d}
-                  onClick={() => toggleDecision(d)}
-                  aria-pressed={on}
-                  disabled={!layers.applicants}
-                  className={cx(
-                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-opacity disabled:opacity-40',
-                    on ? cx(st.bg, st.text) : 'bg-white text-muted ring-line opacity-60',
-                  )}
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ background: on ? st.hex : '#cbd5e1' }} />
-                  {st.short}
-                  <span className="tabular">{byDecision[d]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        {/* Map */}
-        <Card className="relative isolate h-[60vh] min-h-[360px] overflow-hidden lg:h-[calc(100vh-250px)] lg:min-h-[480px]">
-          <DemandMap
-            city={city}
-            cityPins={cityPins}
-            pinIndex={pinIndex}
-            shapes={shapes}
-            pinStats={pinStats}
-            stores={stores}
-            results={results}
-            decisionFilter={decisionFilter}
-            layers={layers}
-            focusPin={focusPin}
-            activePin={activePin}
-            onHoverPin={setHoverPin}
-            onSelectPin={setSelectedPin}
-            onOpenApplicant={(uid) => openApplicant(uid)}
-          />
-
-          {/* Pin info card */}
-          <div className="pointer-events-none absolute right-2 top-2 z-[1000] w-[min(240px,calc(100%-60px))]">
-            {active ? (
-              <div className="pointer-events-auto rounded-lg border border-line bg-white/95 p-3 text-xs shadow-md backdrop-blur">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="tabular text-sm font-semibold text-ink">{active.pin}</p>
-                    <p className="truncate text-muted">{active.name}</p>
-                  </div>
-                  <span className="tabular rounded-md px-1.5 py-0.5 text-sm font-semibold text-white" style={{ background: demandColor(Math.max(active.demandIndex, 45)) }}>
-                    {Math.round(active.demandIndex)}
-                  </span>
-                </div>
-                <dl className="mt-2 grid grid-cols-[1fr_auto] gap-x-3 gap-y-1">
-                  <dt className="text-muted">Demand index</dt>
-                  <dd className="tabular text-right font-medium">{Math.round(active.demandIndex)} / 100</dd>
-                  {active.onlineOrders !== null && (
-                    <>
-                      <dt className="text-muted">Online orders</dt>
-                      <dd className="tabular text-right font-medium">{fmtInt(active.onlineOrders)}</dd>
-                    </>
-                  )}
-                  <dt className="text-muted">Nearest store</dt>
-                  <dd className="tabular text-right font-medium">
-                    {active.nearestStoreKm !== null ? `${fmtKm(active.nearestStoreKm)} (${active.nearestStoreId})` : 'none in city'}
-                  </dd>
-                  <dt className="text-muted">Applicants here</dt>
-                  <dd className="tabular text-right font-medium">{active.applicants}</dd>
-                </dl>
-                <p className="mt-2 text-[10px] text-muted">{active.source === 'orders' ? 'Simulated order data' : 'Demand proxy v1 (tier + centre)'}</p>
-                {active.nearestStoreKm !== null && active.nearestStoreKm < OVERLAP_RADIUS_KM[tier] && (
-                  <p className="mt-1 flex items-center gap-1 text-[11px] text-waitlist">
-                    <AlertTriangle size={11} /> Inside a store's {OVERLAP_RADIUS_KM[tier]} km overlap radius
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div className="pointer-events-auto hidden rounded-lg border border-line bg-white/90 px-3 py-2 text-[11px] text-muted shadow-sm sm:block">
-                <Crosshair size={12} className="mr-1 inline" />
-                Hover or tap a pin area for details
-              </div>
-            )}
-          </div>
-
-          {/* Legend */}
-          <div className="absolute bottom-6 left-2 z-[1000] max-w-[calc(100%-16px)] rounded-lg border border-line bg-white/95 p-2.5 text-[11px] shadow-md backdrop-blur">
-            <p className="font-semibold text-ink">Demand index (0–100)</p>
-            <p className="mb-1.5 text-muted">{demandLabel(city)}</p>
-            <div className="flex">
-              {DEMAND_BINS.map((b) => (
-                <div key={b.min} className="flex w-7 flex-col items-start">
-                  <span className="h-2.5 w-full" style={{ background: b.color }} />
-                  <span className="tabular mt-0.5 text-[10px] text-muted">{b.min}</span>
-                </div>
-              ))}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <Card className="relative isolate h-[55vh] overflow-hidden lg:h-[calc(100vh-240px)] lg:min-h-[480px]">
+            <NetworkMap
+              city={city}
+              cityPins={cityPins}
+              shapes={shapes}
+              paint={paint}
+              lines={lines}
+              circles={circles}
+              stores={storeMarkers}
+              points={points}
+              newStore={candidate && selPin && PIN_BY_CODE[selPin] ? { ...PIN_BY_CODE[selPin], label: `New store · ${selPin}` } : null}
+              focus={focus}
+              fitTo={fitTo}
+              onPinClick={onPinClick}
+              onStoreClick={onStoreClick}
+            />
+            <div className="pointer-events-none absolute bottom-3 left-3 z-[1000] hidden sm:block">
+              <Legend mode={blr ? mode : 'proxy'} isolated={!!selStore} planning={!!candidate} overlapKm={overlapKm} />
             </div>
-            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-muted">
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-sm bg-slate-900" /> Store ({OVERLAP_RADIUS_KM[tier]} km radius)
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="h-2.5 w-2.5 rounded-full border-2 border-dashed border-orange-700" /> 80% of customers
-              </span>
-            </div>
-          </div>
-
-          {shapeError && (
-            <div className="absolute inset-x-2 top-2 z-[1000] rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-decline sm:right-auto">
-              Pin boundaries could not load ({shapeError}). Stores and applicants are still shown.
-            </div>
-          )}
-          {!shapes && !shapeError && layers.demand && (
-            <div className="absolute left-1/2 top-3 z-[1000] -translate-x-1/2 rounded-full border border-line bg-white px-3 py-1 shadow-sm">
-              <Spinner label="Loading pin boundaries…" />
-            </div>
-          )}
-        </Card>
-
-        {/* Side panel */}
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card>
-            <CardHeader title={`${city} at a glance`} subtitle={`${tier} · overlap radius ${OVERLAP_RADIUS_KM[tier]} km`} />
-            <div className="grid grid-cols-2 gap-px bg-line">
-              <MiniStat icon={<Users size={14} />} label="Applicants" value={cityResults.length} hint={offMap ? `${offMap} not on map (pin unknown)` : undefined} />
-              <MiniStat icon={<Target size={14} />} label="Approved" value={approvedCount} hint={`${byDecision.Approve} now · ${byDecision['Approve with conditions']} conditional`} tone="good" />
-              <MiniStat icon={<MapPin size={14} />} label="Slots" value={output ? `${slotsFilled} / ${slotsTotal}` : '—'} hint={`${cityTerritories.length} territor${cityTerritories.length === 1 ? 'y' : 'ies'}`} />
-              <MiniStat icon={<Store size={14} />} label="Stores" value={cityStores.length} hint={cityStores.length ? cityStores.map((s) => s.id).join(', ') : 'Open market'} />
-            </div>
-            {cityResults.length > 0 && (
-              <div className="px-4 py-3">
-                <div className="flex h-2 overflow-hidden rounded-full bg-slate-100">
-                  {DECISIONS.map((d) =>
-                    byDecision[d] ? <div key={d} title={`${d}: ${byDecision[d]}`} style={{ width: `${(byDecision[d] / cityResults.length) * 100}%`, background: DECISION_STYLE[d].hex }} /> : null,
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted">
-                  {DECISIONS.filter((d) => byDecision[d]).map((d) => (
-                    <span key={d} className="inline-flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full" style={{ background: DECISION_STYLE[d].hex }} />
-                      {DECISION_STYLE[d].short} <span className="tabular text-ink">{byDecision[d]}</span>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
           </Card>
-
-          <Card className="flex min-h-0 flex-col lg:max-h-[calc(100vh-520px)] lg:min-h-[260px]">
-            <CardHeader title="Top gaps" subtitle="High demand, no store close by. Click to fly there." action={gaps.length ? <Pill tone="brand">{gaps.length}</Pill> : undefined} />
-            {!output ? (
-              <div className="p-6">
-                <Spinner label="Running the rules…" />
-              </div>
-            ) : gaps.length === 0 ? (
-              <EmptyState
-                icon={<Info size={28} />}
-                title={`No open gaps in ${city}`}
-                body={results.length ? 'Every high-demand pin here is within reach of a store or has an applicant.' : 'Gaps appear once decisions are ready.'}
-              />
-            ) : (
-              <ul className="divide-y divide-line overflow-y-auto">
-                {gaps.slice(0, 25).map((g, i) => (
-                  <li key={g.pin}>
-                    <button
-                      onClick={() => flyTo(g.pin)}
-                      className={cx('flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50', selectedPin === g.pin && 'bg-brand-50')}
-                    >
-                      <span className="tabular mt-0.5 w-4 shrink-0 text-xs text-muted">{i + 1}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <p className="truncate text-sm font-medium text-ink">
-                            <span className="tabular">{g.pin}</span> <span className="font-normal text-muted">{g.name}</span>
-                          </p>
-                          <span className="tabular shrink-0 text-sm font-semibold text-brand-700">{Math.round(g.demandIndex)}</span>
-                        </div>
-                        <p className="tabular mt-0.5 text-[11px] text-muted">
-                          {fmtKm(g.nearestStoreKm)} to store
-                          {g.onlineOrders !== null && <> · {fmtInt(g.onlineOrders)} online orders</>}
-                          {' · '}
-                          {g.applicants ? `${g.applicants} applicant${g.applicants > 1 ? 's' : ''}` : 'no applicants'}
-                          {g.territoryId ? ` · ${g.territoryId}` : ' · no territory'}
-                        </p>
-                        {g.note && <p className="mt-0.5 line-clamp-2 text-[11px] text-muted">{g.note}</p>}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <p className="px-1 text-[11px] leading-relaxed text-muted">
-            Demand is {city === 'Bengaluru' ? 'simulated online-order data' : 'a rule-based proxy (tier base + bonus near the centre)'}; in production this is the brand's monthly
-            orders-by-pin export. Orders source: {demandSource?.source === 'supabase' ? 'Supabase (live)' : 'bundled copy'}. Applicants sit at their pin's centre, spread
-            slightly so people on the same pin don't overlap.
+          <div className="mt-2 sm:hidden">
+            <Legend mode={blr ? mode : 'proxy'} isolated={!!selStore} planning={!!candidate} overlapKm={overlapKm} />
+          </div>
+          <p className="mt-2 text-xs text-muted">
+            {blr
+              ? `Simulated online and store orders${flows ? `, ${flows.meta.window}` : ''}, scaled so today's stores match the Tier 1 sales assumption. Not live data.`
+              : 'Demand proxy = rulebook tier base + bonus near the city centre. Not order data.'}
           </p>
-          {selectedPin && (
-            <Button size="sm" variant="ghost" onClick={() => setSelectedPin(null)} className="self-start">
-              Clear selected pin
-            </Button>
-          )}
         </div>
+        <Card className="h-fit overflow-hidden lg:max-h-[calc(100vh-240px)] lg:min-h-[480px] lg:overflow-y-auto">{panel}</Card>
       </div>
     </div>
   );
 }
 
-function MiniStat({ icon, label, value, hint, tone }: { icon: ReactNode; label: string; value: ReactNode; hint?: string; tone?: 'good' }) {
+/* ---------------- Legend ---------------- */
+
+function Ramp({ scale, low, high }: { scale: Scale; low: string; high: string }) {
   return (
-    <div className="min-w-0 bg-white px-4 py-3">
-      <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted">
-        {icon}
-        {label}
-      </p>
-      <p className={cx('tabular mt-1 text-xl font-semibold', tone === 'good' ? 'text-approve' : 'text-ink')}>{value}</p>
-      {hint && <p className="truncate text-[11px] text-muted" title={hint}>{hint}</p>}
+    <div className="flex items-center gap-1.5">
+      <span className="text-muted">{low}</span>
+      <span className="flex h-2 w-24 overflow-hidden rounded-sm">
+        {scale.colors.map((c) => (
+          <span key={c} className="flex-1" style={{ background: c }} />
+        ))}
+      </span>
+      <span className="text-muted">{high}</span>
+    </div>
+  );
+}
+
+function Key({ swatch, children }: { swatch: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex w-5 justify-center">{swatch}</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
+const line = (color: string, dashed = false) => <span className="w-5" style={{ borderTop: `${dashed ? 2 : 3}px ${dashed ? 'dashed' : 'solid'} ${color}` }} />;
+const ring = (color: string) => <span className="h-3 w-3 rounded-full" style={{ border: `3px solid ${color}`, background: '#111827' }} />;
+
+function Legend({ mode, isolated, planning, overlapKm }: { mode: Mode | 'proxy'; isolated: boolean; planning: boolean; overlapKm: number }) {
+  return (
+    <div className="space-y-1 rounded-lg border border-line bg-white/95 px-3 py-2 text-[11px] text-ink shadow-sm">
+      {mode === 'traffic' && (
+        <>
+          <p className="font-medium">{isolated ? 'Orders per month to this store' : 'Orders per month per pin (store + online)'}</p>
+          <Ramp scale={isolated ? FEED_SCALE : TRAFFIC_SCALE} low="few" high="many" />
+          <Key swatch={ring('#1d4ed8')}>Store, ring = load vs capacity</Key>
+          <Key swatch={ring('#b91c1c')}>Heavy lifter (75%+ of capacity)</Key>
+          {isolated && <Key swatch={line(FLOW_COLOR.today)}>Customer flow, width = orders</Key>}
+          {isolated && <Key swatch={line(FLOW_COLOR.today, true)}>80% of customers live inside</Key>}
+          <Key swatch={<span className="h-3 w-3 rounded-full border border-dashed border-gray-900 bg-gray-900/10" />}>{overlapKm} km overlap radius</Key>
+        </>
+      )}
+      {mode === 'leaks' && (
+        <>
+          <p className="font-medium">Missed orders per month per pin</p>
+          <Ramp scale={LEAK_SCALE} low="few" high="many" />
+          <Key swatch={line(FLOW_COLOR.redirect)}>Orders travelling more than 4 km</Key>
+        </>
+      )}
+      {mode === 'plan' && !planning && (
+        <>
+          <p className="font-medium">New orders per month a store here would win</p>
+          <Ramp scale={OPPORTUNITY_SCALE} low="few" high="many" />
+          <Key swatch={<span className="h-3 w-3 rounded-sm bg-gray-300" />}>Existing store pin</Key>
+        </>
+      )}
+      {mode === 'plan' && planning && (
+        <>
+          <p className="font-medium">If a store opens at the blue marker</p>
+          <Key swatch={line(FLOW_COLOR.won)}>New orders won back</Key>
+          <Key swatch={line(FLOW_COLOR.taken)}>Orders taken from our stores</Key>
+          <Key swatch={line(FLOW_COLOR.oldRoute, true)}>Today's route (before)</Key>
+          <Key swatch={<span className="h-3 w-3 rounded-full border-2 border-dashed border-brand-700" />}>Catchment radius</Key>
+        </>
+      )}
+      {mode === 'proxy' && (
+        <>
+          <p className="font-medium">Demand proxy (0-100)</p>
+          <Ramp scale={DEMAND_INDEX_SCALE} low="low" high="high" />
+          <Key swatch={ring('#111827')}>Existing store</Key>
+          <Key swatch={<span className="h-3 w-3 rounded-full border border-dashed border-gray-900 bg-gray-900/10" />}>{overlapKm} km overlap radius</Key>
+        </>
+      )}
+      <Key swatch={<span className="h-2.5 w-2.5 rounded-full border border-white" style={{ background: DECISION_STYLE.Approve.hex }} />}>Approved franchise</Key>
     </div>
   );
 }

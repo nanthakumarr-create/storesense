@@ -1,6 +1,7 @@
 // Structured replies built only from engine output (Result / TerritoryStatus / GapPin fields).
 // Nothing here invents a number: if the engine did not produce it, the reply does not say it.
-import type { Decision, DecisionChange, EngineOutput, ParseResult, Result } from '../types';
+import type { Decision, DecisionChange, EngineOutput, ParseResult, Partnership, Result } from '../types';
+import { BUFFER_MONTHS, PAYBACK_TARGET_MONTHS } from '../config/rules';
 import type { Intent, ListFilter, ResolvedUpdate } from './intents';
 
 export interface ApplicantRef {
@@ -42,10 +43,18 @@ export interface CompareTable {
   rows: { label: string; a: string; b: string; better: 'a' | 'b' | null }[];
 }
 
+/** A link the UI turns into a button: applicant page, territory page or the map at a pin. */
+export interface ReplyLink {
+  kind: 'applicant' | 'territory' | 'map';
+  id: string; // applicant uid, territory ID or pin
+  label: string;
+}
+
 export interface Reply {
   text: string;
   bullets: string[];
   sections?: ReplySection[];
+  links?: ReplyLink[];
   /** Applicant chips; the first one is the subject when `focus` is set. */
   cards?: ApplicantRef[];
   focus?: ApplicantRef & { headline: string; numbers: { label: string; value: string }[] };
@@ -139,15 +148,30 @@ export function explainReply(r: Result, premise?: Decision[], duplicates: Result
       ],
       tone: 'good',
     });
+  if (r.partnership) {
+    const p = r.partnership;
+    sections.push({
+      title: p.status === 'allocated' ? 'Partnership (approved as a pair)' : 'Suggested partnership',
+      bullets: [
+        `${p.status === 'allocated' ? 'Paired' : 'Could pair'} with ${p.withAppId} ${p.withName}. ${r.appId} would ${p.role === 'operator' ? 'run the store day to day' : 'fund the store'}; ${p.withAppId} would ${p.role === 'operator' ? 'fund it' : 'run it'}.`,
+      ],
+      tone: 'good',
+    });
+  }
   if (r.nextSteps.length) sections.push({ title: 'Next steps', bullets: r.nextSteps });
   if (r.whatWouldChange.length) sections.push({ title: 'What would change this', bullets: r.whatWouldChange });
   const bullets: string[] = [];
   if (duplicates.length > 1)
     bullets.push(`${duplicates.length} rows use ${r.appId} (Excel rows ${duplicates.map((d) => d.uid.split('#row')[1] ?? '?').join(', ')}). Showing the first one.`);
+  const links: ReplyLink[] = [{ kind: 'applicant', id: r.uid, label: `Open ${r.appId}` }];
+  if (r.partnership) links.push({ kind: 'applicant', id: r.partnership.withUid, label: `Open ${r.partnership.withAppId}` });
+  if (r.territoryId) links.push({ kind: 'territory', id: r.territoryId, label: `Compare ${r.territoryId}` });
+  if (r.redirect) links.push({ kind: 'map', id: r.redirect.pin, label: `See ${r.redirect.pin} on the map` });
   return {
     text,
     bullets,
     sections,
+    links,
     focus: { ...refOf(r), headline: r.headline, numbers: keyNumbers(r) },
     tone: premiseWrong ? 'warn' : 'info',
     followUps: followUpsFor(r),
@@ -156,6 +180,7 @@ export function explainReply(r: Result, premise?: Decision[], duplicates: Result
 
 function followUpsFor(r: Result): string[] {
   const f: string[] = [];
+  if (r.partnership) f.push(`Who could partner with ${r.appId}?`);
   if (r.decision === 'Hold' && r.asks.length) f.push(`${r.appId} has now sent the missing details`);
   if (r.economics.capitalGapLakh > 0) f.push(`${r.appId} got a loan of ${Math.ceil(r.economics.capitalGapLakh)} lakh`);
   if (r.place.pin && !r.reasonCodes.some((c) => /SPACE/.test(c)) && r.decision !== 'Approve') f.push(`${r.appId} has now found a ground-floor space`);
@@ -262,11 +287,119 @@ export function territoryReply(output: EngineOutput, terId: string): Reply {
     ...t.filled.map((f) => ({ uid: f.uid, appId: f.appId, name: f.name, decision: f.decision })),
     ...t.contenders.map((c) => ({ uid: c.uid, appId: c.appId, name: c.name, decision: c.decision })),
   ];
+  const pairs = output.partnerships.filter((p) => p.territoryId === t.id);
+  if (pairs.length) bullets.push(`${pairs.length} partnership${pairs.length === 1 ? '' : 's'} in ${t.id} (ask "partnerships in ${t.id}").`);
   return {
     text: `${t.id} · ${t.city} · ${t.tier} · ${t.priority} priority: ${t.filled.length} of ${t.openSlots} slot${t.openSlots === 1 ? '' : 's'} filled, ${t.filled.length + t.contenders.length} applicant${t.filled.length + t.contenders.length === 1 ? '' : 's'}.`,
     bullets,
     sections,
     cards: refs,
+    links: [{ kind: 'territory', id: t.id, label: `Open ${t.id} comparison` }],
+    followUps: pairs.length ? [`Partnerships in ${t.id}`] : undefined,
+  };
+}
+
+// ---------------------------------------------------------------- partnerships
+
+const PAIR_RULE =
+  'A partnership pairs an operator (retail experience, short of money) with an investor (money, little or no experience) in the same territory, so the store has both the cash and someone who can run it.';
+
+function pairSection(p: Partnership, full = true): ReplySection {
+  const gap = p.combinedInvestmentLakh - p.totalCashNeedLakh;
+  const title = `${p.operatorAppId} ${p.operatorName} runs it + ${p.investorAppId} ${p.investorName} funds it`;
+  const tone = p.status === 'allocated' ? 'good' : 'neutral';
+  if (!full) {
+    return {
+      title,
+      bullets: [
+        `${p.pin} ${p.pinName}${p.territoryId ? ` (${p.territoryId})` : ''} · ${p.status === 'allocated' ? 'won a slot' : 'suggested'} · ${lakh(p.combinedInvestmentLakh)} combined vs ${lakh(p.totalCashNeedLakh)} needed · joint partner score ${sc(p.partnerScore)} · payback ${mo(p.paybackMonths)}.`,
+      ],
+      tone,
+    };
+  }
+  const bullets = [
+    `Store at ${p.pin} ${p.pinName}${p.territoryId ? ` (${p.territoryId})` : ''}. ${p.status === 'allocated' ? 'Won a slot: both approved as a pair.' : 'Suggested by the rules; not yet agreed by the two applicants.'}`,
+    `Money: ${lakh(p.combinedInvestmentLakh)} combined vs ${lakh(p.totalCashNeedLakh)} needed (investment + ${BUFFER_MONTHS}-month buffer)${gap >= 0 ? ', fully covered' : `, still ${lakh(-gap)} short`}.`,
+    `Joint partner score ${sc(p.partnerScore)}, place ${sc(p.placeScore)}, combined ${sc(p.combinedScore)}${p.rankInTerritory ? `, would rank #${p.rankInTerritory} in ${p.territoryId}` : ''}.`,
+    `Payback ${mo(p.paybackMonths)} (target ${PAYBACK_TARGET_MONTHS} months).`,
+    ...p.covers,
+  ];
+  if (p.outcome && p.status !== 'allocated') bullets.push(p.outcome);
+  return { title, bullets, tone };
+}
+
+export function partnershipsReply(output: EngineOutput, q: { appId?: string; terId?: string }): Reply {
+  const byUid = new Map(output.results.map((r) => [r.uid, r]));
+  const refsOf = (ps: Partnership[]): ApplicantRef[] => {
+    const seen = new Set<string>();
+    const out: ApplicantRef[] = [];
+    for (const p of ps)
+      for (const uid of [p.operatorUid, p.investorUid]) {
+        const r = byUid.get(uid);
+        if (r && !seen.has(uid)) {
+          seen.add(uid);
+          out.push(refOf(r));
+        }
+      }
+    return out;
+  };
+  const order = (ps: Partnership[]) =>
+    [...ps].sort((a, b) => (a.status === b.status ? b.combinedScore - a.combinedScore : a.status === 'allocated' ? -1 : 1));
+  const all = output.partnerships ?? [];
+
+  if (q.appId) {
+    const r = findByAppId(output, q.appId)[0];
+    if (!r) return unknownIdReply(output, q.appId);
+    const ps = order(all.filter((p) => p.operatorUid === r.uid || p.investorUid === r.uid));
+    if (!ps.length) {
+      return {
+        text: `No partnership is suggested for ${r.appId} (${r.name}). It is ${VERB[r.decision]}: ${r.headline}`,
+        bullets: [PAIR_RULE, `No applicant in ${r.territoryId ?? 'the same territory'} covers what ${r.appId} is missing, or ${r.appId} does not need a partner.`],
+        cards: [refOf(r)],
+        links: [{ kind: 'applicant', id: r.uid, label: `Open ${r.appId}` }, ...(r.territoryId ? [{ kind: 'territory' as const, id: r.territoryId, label: `Compare ${r.territoryId}` }] : [])],
+        followUps: [`Why is ${r.appId} ${VERB[r.decision]}?`, 'Show partnerships'],
+      };
+    }
+    const p = ps[0];
+    const role = p.operatorUid === r.uid ? 'operator' : 'investor';
+    const other = role === 'operator' ? { uid: p.investorUid, id: p.investorAppId, name: p.investorName } : { uid: p.operatorUid, id: p.operatorAppId, name: p.operatorName };
+    return {
+      text: `${other.id} ${other.name} ${p.status === 'allocated' ? 'is approved as a pair with' : 'could partner with'} ${r.appId}: ${r.appId} would ${role === 'operator' ? 'run the store' : 'fund the store'} and ${other.id} would ${role === 'operator' ? 'fund it' : 'run it'}.${ps.length > 1 ? ` ${ps.length - 1} other option${ps.length > 2 ? 's' : ''} below.` : ''}`,
+      bullets: [],
+      sections: ps.slice(0, 3).map((x, i) => pairSection(x, i === 0)),
+      cards: refsOf(ps),
+      links: [
+        { kind: 'applicant', id: r.uid, label: `Open ${r.appId}` },
+        { kind: 'applicant', id: other.uid, label: `Open ${other.id}` },
+        ...(p.territoryId ? [{ kind: 'territory' as const, id: p.territoryId, label: `Compare ${p.territoryId}` }] : []),
+        { kind: 'map', id: p.pin, label: `See ${p.pin} on the map` },
+      ],
+      followUps: [`Compare ${p.operatorAppId} and ${p.investorAppId}`, ...(p.territoryId ? [`Partnerships in ${p.territoryId}`] : [])],
+    };
+  }
+
+  const scoped = order(all.filter((p) => !q.terId || (p.territoryId ?? '').toUpperCase() === q.terId.toUpperCase()));
+  const where = q.terId ? ` in ${q.terId}` : '';
+  if (!scoped.length) {
+    return {
+      text: `No partnerships${where}.`,
+      bullets: [PAIR_RULE, q.terId ? `Nobody in ${q.terId} has the money but not the experience while another applicant there has the experience but not the money.` : 'No territory has both kinds of applicant.'],
+      links: q.terId ? [{ kind: 'territory', id: q.terId, label: `Compare ${q.terId}` }] : undefined,
+      tone: 'info',
+    };
+  }
+  const allocated = scoped.filter((p) => p.status === 'allocated').length;
+  const shown = scoped.slice(0, 8);
+  const bullets = [PAIR_RULE];
+  if (scoped.length > shown.length) bullets.push(`Showing the top ${shown.length} by combined score; ${scoped.length - shown.length} more are in the applicant list below.`);
+  bullets.push('Ask "who could partner with APP-…" for the full reasoning behind one pair.');
+  const ters = [...new Set(scoped.map((p) => p.territoryId).filter((x): x is string => !!x))];
+  return {
+    text: `${scoped.length} partnership${scoped.length === 1 ? '' : 's'}${where}: ${allocated} won a slot, ${scoped.length - allocated} suggested.`,
+    bullets,
+    sections: shown.map((p) => pairSection(p, false)),
+    cards: refsOf(scoped),
+    links: ters.slice(0, 4).map((id) => ({ kind: 'territory' as const, id, label: `Compare ${id}` })),
   };
 }
 
@@ -282,6 +415,7 @@ export function gapsReply(output: EngineOutput, city?: string): Reply {
       (g) =>
         `${g.pin} ${g.name} (${g.city}${g.territoryId ? `, ${g.territoryId}` : ', no territory'}): demand ${g.demandIndex}/100${g.onlineOrders !== null ? `, ${g.onlineOrders.toLocaleString('en-IN')} online orders` : ''}, ${km(g.nearestStoreKm)} to the nearest store, ${g.applicants} applicant${g.applicants === 1 ? '' : 's'}. ${g.note}`,
     ),
+    links: top.slice(0, 3).map((g) => ({ kind: 'map' as const, id: g.pin, label: `See ${g.pin} on the map` })),
     followUps: ['Show redirects', 'Who is waitlisted?'],
   };
 }
@@ -295,6 +429,8 @@ export const EXAMPLES = [
   'Who is waitlisted in Mysuru?',
   'What happened in TER-02?',
   'Compare APP-003 and APP-045',
+  'Who could partner with APP-038?',
+  'Show partnerships',
   'Where should we open next?',
 ];
 
@@ -304,6 +440,7 @@ export function helpReply(): Reply {
     bullets: [],
     sections: [
       { title: 'Questions', bullets: ['Why is APP-007 on hold?', 'Tell me about APP-045', 'Compare APP-003 and APP-045', 'What happened in TER-02?', 'Who is waitlisted in Mysuru?', 'Where should we open next?'] },
+      { title: 'Partnerships (money + experience)', bullets: ['Who could partner with APP-038?', 'Partnerships in TER-02', 'Show partnerships'] },
       {
         title: 'New information (re-runs the decision)',
         bullets: [
@@ -346,6 +483,8 @@ export function buildAnswer(intent: Intent, output: EngineOutput | null, _parse?
       return territoryReply(output, intent.terId);
     case 'gaps':
       return gapsReply(output, intent.city);
+    case 'partnerships':
+      return partnershipsReply(output, { appId: intent.appId, terId: intent.terId });
     case 'ambiguous': {
       const refs = intent.candidates.flatMap((id) => findByAppId(output, id).slice(0, 1)).map(refOf);
       return {
@@ -440,7 +579,11 @@ export function buildUpdateReply(appId: string, resolved: ResolvedUpdate, outcom
     bullets: ripple.length ? [`${ripple.length} other applicant${ripple.length === 1 ? '' : 's'} affected (slot allocation re-ran for the territory).`] : [],
     sections,
     diff,
-    tone: changed ? 'info' : 'info',
+    links: [
+      { kind: 'applicant', id: after.uid, label: `Open ${after.appId}` },
+      ...(after.territoryId ? [{ kind: 'territory' as const, id: after.territoryId, label: `Compare ${after.territoryId}` }] : []),
+    ],
+    tone: 'info',
   };
 }
 

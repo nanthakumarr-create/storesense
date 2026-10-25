@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { Decision, EngineOutput, Result } from '../types';
+import type { Decision, EngineOutput, Partnership, Result } from '../types';
 import { buildAnswer, buildUpdateReply, closeIds } from './answer';
 import { parseIntent, resolveUpdate, type UpdateIntent } from './intents';
 
 function res(appId: string, decision: Decision, over: Partial<Result> = {}): Result {
   return {
-    uid: appId, appId, name: `Name ${appId}`, city: 'Bengaluru', pin: '560100', decision,
+    uid: appId, partnership: null, appId, name: `Name ${appId}`, city: 'Bengaluru', pin: '560100', decision,
     headline: `${appId} headline for ${decision}.`,
     reasons: [`Reason for ${appId}: partner score 72/100.`], reasonCodes: [], nextSteps: ['Sign the agreement by 10 Nov 2026.'], preparation: [],
     whatWouldChange: ['A ground-floor space of 400+ sq ft.'], asks: [], conditions: [],
@@ -22,8 +22,22 @@ const r9 = res('APP-009', 'Waitlist', { headline: 'A stronger applicant took the
 const r3 = res('APP-003', 'Approve', { pin: '560037', combinedScore: 78 });
 const r45 = res('APP-045', 'Waitlist', { pin: '560037', combinedScore: 71, partnerScore: 60 });
 const rM = res('APP-070', 'Waitlist', { city: 'Mysuru', territoryId: 'TER-15' });
+const r38 = res('APP-038', 'Waitlist', {
+  combinedScore: 66,
+  partnership: { id: 'PAIR-APP-038+APP-015', role: 'operator', withUid: 'APP-015', withAppId: 'APP-015', withName: 'Name APP-015', status: 'suggested' },
+});
+const r15 = res('APP-015', 'Decline', {
+  combinedScore: 40,
+  partnership: { id: 'PAIR-APP-038+APP-015', role: 'investor', withUid: 'APP-038', withAppId: 'APP-038', withName: 'Name APP-038', status: 'suggested' },
+});
+const pair: Partnership = {
+  id: 'PAIR-APP-038+APP-015', operatorUid: 'APP-038', operatorAppId: 'APP-038', operatorName: 'Name APP-038',
+  investorUid: 'APP-015', investorAppId: 'APP-015', investorName: 'Name APP-015', territoryId: 'TER-02', pin: '560100', pinName: 'Electronic City',
+  combinedInvestmentLakh: 50, totalCashNeedLakh: 40.7, partnerScore: 74, breakdown: [], placeScore: 68, paybackMonths: 22, combinedScore: 73,
+  rankInTerritory: 1, covers: ['APP-038 brings 8 years of optical retail; APP-015 brings ₹40L.'], status: 'suggested', outcome: 'Introduce the two applicants.',
+};
 const out: EngineOutput = {
-  results: [r3, r7, r9, r45, rM],
+  results: [r3, r7, r9, r45, rM, r38, r15],
   territories: [
     {
       id: 'TER-02', city: 'Bengaluru', tier: 'Tier 1', priority: 'High', openSlots: 1,
@@ -33,7 +47,8 @@ const out: EngineOutput = {
     },
   ],
   gaps: [{ pin: '560100', name: 'Electronic City', city: 'Bengaluru', territoryId: 'TER-02', demandIndex: 82, onlineOrders: 1200, nearestStoreKm: 6.1, applicants: 0, note: '' }],
-  summary: { total: 5, byDecision: { Approve: 1, 'Approve with conditions': 0, Redirect: 0, Waitlist: 3, Hold: 1, Decline: 0 }, slotsTotal: 1, slotsFilled: 1, pinConflicts: 0, dataIssues: 0 },
+  partnerships: [pair],
+  summary: { total: 7, byDecision: { Approve: 1, 'Approve with conditions': 0, Redirect: 0, Waitlist: 3, Hold: 1, Decline: 0 }, slotsTotal: 1, slotsFilled: 1, pinConflicts: 0, dataIssues: 0 },
   asOf: '2026-10-25',
   hash: 'x',
 };
@@ -76,6 +91,25 @@ describe('buildAnswer', () => {
     expect(a.compare?.rows.find((r) => r.label === 'Combined score')?.better).toBe('a');
   });
   it('gaps are labelled simulated', () => expect(ask('where should we open next').text).toMatch(/simulated/));
+  it('who could partner with an applicant', () => {
+    const a = ask('Who could partner with APP-038?');
+    expect(a.text).toMatch(/^APP-015 Name APP-015 could partner with APP-038: APP-038 would run the store/);
+    expect(a.sections?.[0].bullets.join(' ')).toMatch(/₹50L combined vs ₹41L needed/);
+    expect(a.links?.map((l) => `${l.kind}:${l.id}`)).toEqual(['applicant:APP-038', 'applicant:APP-015', 'territory:TER-02', 'map:560100']);
+  });
+  it('partnership for the investor side', () => expect(ask('can APP-015 partner with someone').text).toMatch(/APP-038 .* could partner with APP-015: APP-015 would fund the store/));
+  it('no partnership for an applicant says so', () => expect(ask('who could partner with APP-003').text).toMatch(/^No partnership is suggested for APP-003/));
+  it('partnerships in a territory', () => {
+    const a = ask('partnerships in TER-02');
+    expect(a.text).toBe('1 partnership in TER-02: 0 won a slot, 1 suggested.');
+    expect(a.cards?.map((c) => c.appId)).toEqual(['APP-038', 'APP-015']);
+  });
+  it('no partnerships in another territory', () => expect(ask('show partnerships in TER-15').text).toBe('No partnerships in TER-15.'));
+  it('explain mentions the partnership and links the territory', () => {
+    const a = ask('Tell me about APP-015');
+    expect(a.sections?.find((s) => s.title === 'Suggested partnership')?.bullets[0]).toMatch(/Could pair with APP-038/);
+    expect(a.links?.some((l) => l.kind === 'territory' && l.id === 'TER-02')).toBe(true);
+  });
   it('no data', () => expect(buildAnswer(parseIntent('why APP-007', IDS), { ...out, results: [] }).tone).toBe('warn'));
 });
 

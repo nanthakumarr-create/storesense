@@ -200,3 +200,15 @@ describe('resolveUpdate', () => {
     expect(r.patch).toMatchObject({ spaceAvailable: 'Not yet identified', spaceSizeSqft: null, floor: 'Not known' });
   });
 });
+
+describe('partnership questions', () => {
+  it.each([
+    ['Who could partner with APP-038?', { kind: 'partnerships', appId: 'APP-038' }],
+    ['partnerships in TER-02', { kind: 'partnerships', terId: 'TER-02' }],
+    ['Show partnerships', { kind: 'partnerships' }],
+    ['which applicants could team up?', { kind: 'partnerships' }],
+  ])('%s', (q, want) => expect(parseIntent(q, IDS, NAMES)).toMatchObject(want));
+  it('a co-investor statement is still an update', () => {
+    expect(parseIntent('APP-038 found a business partner with 10 lakh', IDS, NAMES).kind).toBe('update');
+  });
+});

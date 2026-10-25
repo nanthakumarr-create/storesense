@@ -4,7 +4,7 @@
   "window": "2025-10-25 to 2026-10-25 (last 12 months)",
   "sample_scale": 4.59,
   "store_aov_inr": 2555,
-  "capacity_orders_per_month": 900,
+  "capacity_orders_per_month": 600,
   "investment_lakh": 35,
   "fixed_cost_lakh_month": 1.9,
   "contribution_margin": 0.35,
@@ -16,7 +16,7 @@
    "Missed orders: store purchases a pin's customers would make if a store were in their own pin, minus what they make today (they buy online instead or not at all).",
    "Redirected orders: store purchases made by travelling more than 4 km to a far store.",
    "New-store potential: customers for whom the new store would be the closest; their store purchases rise as travel distance falls. Purchases they made at an existing store count as taken from that store (cannibalisation).",
-   "Capacity: one standard store (400-600 sq ft, one eye-test room) handles about 30 orders a day (900 a month)."
+   "Capacity: one standard store (400-600 sq ft, one eye-test room) handles about 20 orders a day (600 a month)."
   ]
  },
  "pins": [
@@ -55,8 +55,8 @@
      "salesLakhPerMonth": 6.96
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 30,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 45,
    "est_sales_lakh_month": 6.96,
    "est_profit_lakh_month": 0.54,
    "payback_months": 65.2,
@@ -107,8 +107,8 @@
      "salesLakhPerMonth": 0.5
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 46,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 69,
    "est_sales_lakh_month": 10.63,
    "est_profit_lakh_month": 1.82,
    "payback_months": 19.2,
@@ -163,8 +163,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 51,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 77,
    "est_sales_lakh_month": 11.77,
    "est_profit_lakh_month": 2.22,
    "payback_months": 15.8,
@@ -223,8 +223,8 @@
      "salesLakhPerMonth": 0.71
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 48,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 73,
    "est_sales_lakh_month": 11.15,
    "est_profit_lakh_month": 2,
    "payback_months": 17.5,
@@ -273,8 +273,8 @@
      "salesLakhPerMonth": 1.87
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 24,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 36,
    "est_sales_lakh_month": 5.58,
    "est_profit_lakh_month": 0.05,
    "payback_months": 666.7,
@@ -323,8 +323,8 @@
      "salesLakhPerMonth": 0.78
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 37,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 55,
    "est_sales_lakh_month": 8.44,
    "est_profit_lakh_month": 1.05,
    "payback_months": 33.2,
@@ -385,8 +385,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 22,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 32,
    "est_sales_lakh_month": 4.97,
    "est_profit_lakh_month": -0.16,
    "payback_months": null,
@@ -445,8 +445,8 @@
      "salesLakhPerMonth": 0.35
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 21,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 31,
    "est_sales_lakh_month": 4.72,
    "est_profit_lakh_month": -0.25,
    "payback_months": null,
@@ -497,8 +497,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 50,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 75,
    "est_sales_lakh_month": 11.55,
    "est_profit_lakh_month": 2.14,
    "payback_months": 16.3,
@@ -551,8 +551,8 @@
      "salesLakhPerMonth": 0.31
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 52,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 79,
    "est_sales_lakh_month": 12.05,
    "est_profit_lakh_month": 2.32,
    "payback_months": 15.1,
@@ -611,8 +611,8 @@
      "salesLakhPerMonth": 1.24
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 42,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 63,
    "est_sales_lakh_month": 9.61,
    "est_profit_lakh_month": 1.47,
    "payback_months": 23.9,
@@ -661,8 +661,8 @@
      "salesLakhPerMonth": 0.28
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 47,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 70,
    "est_sales_lakh_month": 10.76,
    "est_profit_lakh_month": 1.87,
    "payback_months": 18.8,
@@ -711,8 +711,8 @@
      "salesLakhPerMonth": 0.16
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 32,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 48,
    "est_sales_lakh_month": 7.34,
    "est_profit_lakh_month": 0.67,
    "payback_months": 52.4,
@@ -761,8 +761,8 @@
      "salesLakhPerMonth": 0.05
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 27,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 41,
    "est_sales_lakh_month": 6.29,
    "est_profit_lakh_month": 0.3,
    "payback_months": 115.5,
@@ -821,8 +821,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 25,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 37,
    "est_sales_lakh_month": 5.71,
    "est_profit_lakh_month": 0.1,
    "payback_months": 350.6,
@@ -877,8 +877,8 @@
      "salesLakhPerMonth": 0.51
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 28,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 42,
    "est_sales_lakh_month": 6.48,
    "est_profit_lakh_month": 0.37,
    "payback_months": 95,
@@ -933,8 +933,8 @@
      "salesLakhPerMonth": 0.32
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 52,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 78,
    "est_sales_lakh_month": 11.9,
    "est_profit_lakh_month": 2.27,
    "payback_months": 15.4,
@@ -985,8 +985,8 @@
      "salesLakhPerMonth": 0.06
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 51,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 77,
    "est_sales_lakh_month": 11.84,
    "est_profit_lakh_month": 2.24,
    "payback_months": 15.6,
@@ -1041,8 +1041,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 54,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 80,
    "est_sales_lakh_month": 12.34,
    "est_profit_lakh_month": 2.42,
    "payback_months": 14.5,
@@ -1091,8 +1091,8 @@
      "salesLakhPerMonth": 0.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 40,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 61,
    "est_sales_lakh_month": 9.28,
    "est_profit_lakh_month": 1.35,
    "payback_months": 25.9,
@@ -1143,8 +1143,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 54,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 81,
    "est_sales_lakh_month": 12.34,
    "est_profit_lakh_month": 2.42,
    "payback_months": 14.5,
@@ -1193,8 +1193,8 @@
      "salesLakhPerMonth": 0.87
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 36,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 53,
    "est_sales_lakh_month": 8.19,
    "est_profit_lakh_month": 0.97,
    "payback_months": 36.2,
@@ -1255,8 +1255,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 21,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 31,
    "est_sales_lakh_month": 4.79,
    "est_profit_lakh_month": -0.22,
    "payback_months": null,
@@ -1309,8 +1309,8 @@
      "salesLakhPerMonth": 1.34
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 48,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 71,
    "est_sales_lakh_month": 10.95,
    "est_profit_lakh_month": 1.93,
    "payback_months": 18.1,
@@ -1371,8 +1371,8 @@
      "salesLakhPerMonth": 0.01
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 36,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 54,
    "est_sales_lakh_month": 8.32,
    "est_profit_lakh_month": 1.01,
    "payback_months": 34.6,
@@ -1431,8 +1431,8 @@
      "salesLakhPerMonth": 1.5
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 31,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 46,
    "est_sales_lakh_month": 7.04,
    "est_profit_lakh_month": 0.56,
    "payback_months": 62.2,
@@ -1493,8 +1493,8 @@
      "salesLakhPerMonth": 0.09
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 28,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 43,
    "est_sales_lakh_month": 6.54,
    "est_profit_lakh_month": 0.39,
    "payback_months": 90.3,
@@ -1543,8 +1543,8 @@
      "salesLakhPerMonth": 1.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 37,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 56,
    "est_sales_lakh_month": 8.59,
    "est_profit_lakh_month": 1.11,
    "payback_months": 31.7,
@@ -1589,8 +1589,8 @@
      "salesLakhPerMonth": 0.88
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 27,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 41,
    "est_sales_lakh_month": 6.24,
    "est_profit_lakh_month": 0.28,
    "payback_months": 123.1,
@@ -1629,8 +1629,8 @@
      "salesLakhPerMonth": 4.3
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 19,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 28,
    "est_sales_lakh_month": 4.3,
    "est_profit_lakh_month": -0.4,
    "payback_months": null,
@@ -1695,8 +1695,8 @@
      "salesLakhPerMonth": 0.05
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 20,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 29,
    "est_sales_lakh_month": 4.51,
    "est_profit_lakh_month": -0.32,
    "payback_months": null,
@@ -1745,8 +1745,8 @@
      "salesLakhPerMonth": 0.47
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 16,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 24,
    "est_sales_lakh_month": 3.67,
    "est_profit_lakh_month": -0.62,
    "payback_months": null,
@@ -1805,8 +1805,8 @@
      "salesLakhPerMonth": 1.21
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 26,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 39,
    "est_sales_lakh_month": 6.04,
    "est_profit_lakh_month": 0.21,
    "payback_months": 163.2,
@@ -1845,8 +1845,8 @@
      "salesLakhPerMonth": 5.23
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 23,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 34,
    "est_sales_lakh_month": 5.23,
    "est_profit_lakh_month": -0.07,
    "payback_months": null,
@@ -1895,8 +1895,8 @@
      "salesLakhPerMonth": 0.95
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 50,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 75,
    "est_sales_lakh_month": 11.44,
    "est_profit_lakh_month": 2.1,
    "payback_months": 16.6,
@@ -1951,8 +1951,8 @@
      "salesLakhPerMonth": 1.19
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 40,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 60,
    "est_sales_lakh_month": 9.24,
    "est_profit_lakh_month": 1.34,
    "payback_months": 26.2,
@@ -1998,8 +1998,8 @@
      "salesLakhPerMonth": 0.08
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 17,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 25,
    "est_sales_lakh_month": 3.88,
    "est_profit_lakh_month": -0.54,
    "payback_months": null,
@@ -2054,8 +2054,8 @@
      "salesLakhPerMonth": 0.04
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 30,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 46,
    "est_sales_lakh_month": 6.99,
    "est_profit_lakh_month": 0.54,
    "payback_months": 64.2,
@@ -2104,8 +2104,8 @@
      "salesLakhPerMonth": 1.73
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 34,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 51,
    "est_sales_lakh_month": 7.75,
    "est_profit_lakh_month": 0.81,
    "payback_months": 43.1,
@@ -2166,8 +2166,8 @@
      "salesLakhPerMonth": 0.04
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 21,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 31,
    "est_sales_lakh_month": 4.83,
    "est_profit_lakh_month": -0.21,
    "payback_months": null,
@@ -2222,8 +2222,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 18,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 28,
    "est_sales_lakh_month": 4.24,
    "est_profit_lakh_month": -0.42,
    "payback_months": null,
@@ -2272,8 +2272,8 @@
      "salesLakhPerMonth": 0.12
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 4,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 6,
    "est_sales_lakh_month": 1,
    "est_profit_lakh_month": -1.55,
    "payback_months": null,
@@ -2328,8 +2328,8 @@
      "salesLakhPerMonth": 0.37
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 50,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 76,
    "est_sales_lakh_month": 11.61,
    "est_profit_lakh_month": 2.16,
    "payback_months": 16.2,
@@ -2374,8 +2374,8 @@
      "salesLakhPerMonth": 0.61
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 24,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 36,
    "est_sales_lakh_month": 5.45,
    "est_profit_lakh_month": 0.01,
    "payback_months": 3830.8,
@@ -2430,8 +2430,8 @@
      "salesLakhPerMonth": 0.29
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 51,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 76,
    "est_sales_lakh_month": 11.63,
    "est_profit_lakh_month": 2.17,
    "payback_months": 16.1,
@@ -2480,8 +2480,8 @@
      "salesLakhPerMonth": 0.25
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 40,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 60,
    "est_sales_lakh_month": 9.24,
    "est_profit_lakh_month": 1.33,
    "payback_months": 26.2,
@@ -2536,8 +2536,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 50,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 76,
    "est_sales_lakh_month": 11.58,
    "est_profit_lakh_month": 2.15,
    "payback_months": 16.3,
@@ -2586,8 +2586,8 @@
      "salesLakhPerMonth": 0.9
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 33,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 50,
    "est_sales_lakh_month": 7.66,
    "est_profit_lakh_month": 0.78,
    "payback_months": 44.8,
@@ -2632,8 +2632,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 25,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 38,
    "est_sales_lakh_month": 5.79,
    "est_profit_lakh_month": 0.13,
    "payback_months": 279.2,
@@ -2682,8 +2682,8 @@
      "salesLakhPerMonth": 0.06
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 30,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 45,
    "est_sales_lakh_month": 6.85,
    "est_profit_lakh_month": 0.5,
    "payback_months": 70.2,
@@ -2732,8 +2732,8 @@
      "salesLakhPerMonth": 1.21
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 30,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 45,
    "est_sales_lakh_month": 6.85,
    "est_profit_lakh_month": 0.5,
    "payback_months": 70.5,
@@ -2782,8 +2782,8 @@
      "salesLakhPerMonth": 0.69
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 17,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 26,
    "est_sales_lakh_month": 3.94,
    "est_profit_lakh_month": -0.52,
    "payback_months": null,
@@ -2836,8 +2836,8 @@
      "salesLakhPerMonth": 1.42
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 37,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 55,
    "est_sales_lakh_month": 8.44,
    "est_profit_lakh_month": 1.06,
    "payback_months": 33.2,
@@ -2886,8 +2886,8 @@
      "salesLakhPerMonth": 0.62
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 28,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 42,
    "est_sales_lakh_month": 6.45,
    "est_profit_lakh_month": 0.36,
    "payback_months": 97.9,
@@ -2932,8 +2932,8 @@
      "salesLakhPerMonth": 0.15
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 8,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 12,
    "est_sales_lakh_month": 1.9,
    "est_profit_lakh_month": -1.23,
    "payback_months": null,
@@ -2982,8 +2982,8 @@
      "salesLakhPerMonth": 0.29
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 15,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 23,
    "est_sales_lakh_month": 3.54,
    "est_profit_lakh_month": -0.66,
    "payback_months": null,
@@ -3032,8 +3032,8 @@
      "salesLakhPerMonth": 0.3
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 24,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 35,
    "est_sales_lakh_month": 5.41,
    "est_profit_lakh_month": -0.01,
    "payback_months": null,
@@ -3072,8 +3072,8 @@
      "salesLakhPerMonth": 2.15
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 9,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 14,
    "est_sales_lakh_month": 2.16,
    "est_profit_lakh_month": -1.15,
    "payback_months": null,
@@ -3116,8 +3116,8 @@
      "salesLakhPerMonth": 0.62
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 5,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 7,
    "est_sales_lakh_month": 1.14,
    "est_profit_lakh_month": -1.5,
    "payback_months": null,
@@ -3172,8 +3172,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 23,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 34,
    "est_sales_lakh_month": 5.2,
    "est_profit_lakh_month": -0.08,
    "payback_months": null,
@@ -3232,8 +3232,8 @@
      "salesLakhPerMonth": 0.64
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 47,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 70,
    "est_sales_lakh_month": 10.71,
    "est_profit_lakh_month": 1.85,
    "payback_months": 19,
@@ -3294,8 +3294,8 @@
      "salesLakhPerMonth": 0.05
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 22,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 32,
    "est_sales_lakh_month": 4.95,
    "est_profit_lakh_month": -0.17,
    "payback_months": null,
@@ -3348,8 +3348,8 @@
      "salesLakhPerMonth": 0.8
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 42,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 63,
    "est_sales_lakh_month": 9.73,
    "est_profit_lakh_month": 1.51,
    "payback_months": 23.2,
@@ -3392,8 +3392,8 @@
      "salesLakhPerMonth": 1.51
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 19,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 29,
    "est_sales_lakh_month": 4.43,
    "est_profit_lakh_month": -0.35,
    "payback_months": null,
@@ -3438,8 +3438,8 @@
      "salesLakhPerMonth": 0.22
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 7,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 10,
    "est_sales_lakh_month": 1.51,
    "est_profit_lakh_month": -1.37,
    "payback_months": null,
@@ -3498,8 +3498,8 @@
      "salesLakhPerMonth": 0.49
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 27,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 41,
    "est_sales_lakh_month": 6.27,
    "est_profit_lakh_month": 0.3,
    "payback_months": 118.3,
@@ -3538,8 +3538,8 @@
      "salesLakhPerMonth": 4.17
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 18,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 27,
    "est_sales_lakh_month": 4.18,
    "est_profit_lakh_month": -0.44,
    "payback_months": null,
@@ -3594,8 +3594,8 @@
      "salesLakhPerMonth": 0.06
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 14,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 21,
    "est_sales_lakh_month": 3.15,
    "est_profit_lakh_month": -0.8,
    "payback_months": null,
@@ -3650,8 +3650,8 @@
      "salesLakhPerMonth": 0.61
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 38,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 57,
    "est_sales_lakh_month": 8.76,
    "est_profit_lakh_month": 1.17,
    "payback_months": 30,
@@ -3704,8 +3704,8 @@
      "salesLakhPerMonth": 0.45
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 48,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 71,
    "est_sales_lakh_month": 10.94,
    "est_profit_lakh_month": 1.93,
    "payback_months": 18.2,
@@ -3754,8 +3754,8 @@
      "salesLakhPerMonth": 0.41
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 47,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 70,
    "est_sales_lakh_month": 10.7,
    "est_profit_lakh_month": 1.84,
    "payback_months": 19,
@@ -3795,8 +3795,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 3,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 5,
    "est_sales_lakh_month": 0.79,
    "est_profit_lakh_month": -1.62,
    "payback_months": null,
@@ -3841,8 +3841,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 5,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 8,
    "est_sales_lakh_month": 1.22,
    "est_profit_lakh_month": -1.47,
    "payback_months": null,
@@ -3885,7 +3885,7 @@
      "salesLakhPerMonth": 0.14
     }
    ],
-   "capacity_orders_month": 900,
+   "capacity_orders_month": 600,
    "capacity_use_pct": 2,
    "est_sales_lakh_month": 0.36,
    "est_profit_lakh_month": -1.77,
@@ -3931,8 +3931,8 @@
      "salesLakhPerMonth": 1.91
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 29,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 43,
    "est_sales_lakh_month": 6.6,
    "est_profit_lakh_month": 0.41,
    "payback_months": 85.4,
@@ -3987,8 +3987,8 @@
      "salesLakhPerMonth": 0.08
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 46,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 69,
    "est_sales_lakh_month": 10.64,
    "est_profit_lakh_month": 1.82,
    "payback_months": 19.2,
@@ -4043,8 +4043,8 @@
      "salesLakhPerMonth": 0.01
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 47,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 70,
    "est_sales_lakh_month": 10.78,
    "est_profit_lakh_month": 1.87,
    "payback_months": 18.7,
@@ -4097,8 +4097,8 @@
      "salesLakhPerMonth": 0.15
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 8,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 12,
    "est_sales_lakh_month": 1.84,
    "est_profit_lakh_month": -1.26,
    "payback_months": null,
@@ -4138,8 +4138,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 4,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 6,
    "est_sales_lakh_month": 0.91,
    "est_profit_lakh_month": -1.58,
    "payback_months": null,
@@ -4184,8 +4184,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 6,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 9,
    "est_sales_lakh_month": 1.36,
    "est_profit_lakh_month": -1.42,
    "payback_months": null,
@@ -4234,8 +4234,8 @@
      "salesLakhPerMonth": 0.04
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 14,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 21,
    "est_sales_lakh_month": 3.29,
    "est_profit_lakh_month": -0.75,
    "payback_months": null,
@@ -4288,8 +4288,8 @@
      "salesLakhPerMonth": 0.28
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 26,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 39,
    "est_sales_lakh_month": 5.98,
    "est_profit_lakh_month": 0.19,
    "payback_months": 180.1,
@@ -4338,8 +4338,8 @@
      "salesLakhPerMonth": 0.58
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 33,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 49,
    "est_sales_lakh_month": 7.53,
    "est_profit_lakh_month": 0.73,
    "payback_months": 47.6,
@@ -4402,8 +4402,8 @@
      "salesLakhPerMonth": 0.28
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 29,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 44,
    "est_sales_lakh_month": 6.74,
    "est_profit_lakh_month": 0.46,
    "payback_months": 76.2,
@@ -4452,8 +4452,8 @@
      "salesLakhPerMonth": 0.41
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 40,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 59,
    "est_sales_lakh_month": 9.09,
    "est_profit_lakh_month": 1.28,
    "payback_months": 27.3,
@@ -4518,8 +4518,8 @@
      "salesLakhPerMonth": 0.14
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 22,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 34,
    "est_sales_lakh_month": 5.15,
    "est_profit_lakh_month": -0.1,
    "payback_months": null,
@@ -4570,8 +4570,8 @@
      "salesLakhPerMonth": 0.03
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 42,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 63,
    "est_sales_lakh_month": 9.59,
    "est_profit_lakh_month": 1.46,
    "payback_months": 24,
@@ -4620,8 +4620,8 @@
      "salesLakhPerMonth": 0.14
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 22,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 33,
    "est_sales_lakh_month": 5.11,
    "est_profit_lakh_month": -0.11,
    "payback_months": null,
@@ -4674,8 +4674,8 @@
      "salesLakhPerMonth": 1.68
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 37,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 55,
    "est_sales_lakh_month": 8.45,
    "est_profit_lakh_month": 1.06,
    "payback_months": 33.1,
@@ -4734,8 +4734,8 @@
      "salesLakhPerMonth": 0.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 7,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 11,
    "est_sales_lakh_month": 1.63,
    "est_profit_lakh_month": -1.33,
    "payback_months": null,
@@ -4790,8 +4790,8 @@
      "salesLakhPerMonth": 0.07
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 13,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 20,
    "est_sales_lakh_month": 3.08,
    "est_profit_lakh_month": -0.82,
    "payback_months": null,
@@ -4856,8 +4856,8 @@
      "salesLakhPerMonth": 0.14
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 28,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 42,
    "est_sales_lakh_month": 6.45,
    "est_profit_lakh_month": 0.36,
    "payback_months": 97.7,
@@ -4922,8 +4922,8 @@
      "salesLakhPerMonth": 0.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 26,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 39,
    "est_sales_lakh_month": 6.01,
    "est_profit_lakh_month": 0.21,
    "payback_months": 170.7,
@@ -4976,8 +4976,8 @@
      "salesLakhPerMonth": 1.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 51,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 76,
    "est_sales_lakh_month": 11.64,
    "est_profit_lakh_month": 2.17,
    "payback_months": 16.1,
@@ -5020,8 +5020,8 @@
      "salesLakhPerMonth": 0.27
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 3,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 5,
    "est_sales_lakh_month": 0.71,
    "est_profit_lakh_month": -1.65,
    "payback_months": null,
@@ -5061,8 +5061,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 12,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 18,
    "est_sales_lakh_month": 2.77,
    "est_profit_lakh_month": -0.93,
    "payback_months": null,
@@ -5111,8 +5111,8 @@
      "salesLakhPerMonth": 0.06
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 13,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 19,
    "est_sales_lakh_month": 2.89,
    "est_profit_lakh_month": -0.89,
    "payback_months": null,
@@ -5157,8 +5157,8 @@
      "salesLakhPerMonth": 0.31
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 17,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 25,
    "est_sales_lakh_month": 3.83,
    "est_profit_lakh_month": -0.56,
    "payback_months": null,
@@ -5198,8 +5198,8 @@
      "salesLakhPerMonth": 0.62
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 24,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 36,
    "est_sales_lakh_month": 5.5,
    "est_profit_lakh_month": 0.02,
    "payback_months": 1415,
@@ -5254,8 +5254,8 @@
      "salesLakhPerMonth": 0.18
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 40,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 60,
    "est_sales_lakh_month": 9.13,
    "est_profit_lakh_month": 1.29,
    "payback_months": 27,
@@ -5304,8 +5304,8 @@
      "salesLakhPerMonth": 0.27
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 16,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 24,
    "est_sales_lakh_month": 3.71,
    "est_profit_lakh_month": -0.6,
    "payback_months": null,
@@ -5364,8 +5364,8 @@
      "salesLakhPerMonth": 0.1
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 25,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 38,
    "est_sales_lakh_month": 5.75,
    "est_profit_lakh_month": 0.11,
    "payback_months": 307.8,
@@ -5420,8 +5420,8 @@
      "salesLakhPerMonth": 0.01
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 16,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 24,
    "est_sales_lakh_month": 3.7,
    "est_profit_lakh_month": -0.6,
    "payback_months": null,
@@ -5470,8 +5470,8 @@
      "salesLakhPerMonth": 0.05
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 4,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 6,
    "est_sales_lakh_month": 0.86,
    "est_profit_lakh_month": -1.6,
    "payback_months": null,
@@ -5514,8 +5514,8 @@
      "salesLakhPerMonth": 0.13
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 2,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 3,
    "est_sales_lakh_month": 0.46,
    "est_profit_lakh_month": -1.74,
    "payback_months": null,
@@ -5562,8 +5562,8 @@
      "salesLakhPerMonth": 0.24
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 2,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 3,
    "est_sales_lakh_month": 0.51,
    "est_profit_lakh_month": -1.72,
    "payback_months": null,
@@ -5608,8 +5608,8 @@
      "salesLakhPerMonth": 0.06
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 6,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 9,
    "est_sales_lakh_month": 1.36,
    "est_profit_lakh_month": -1.43,
    "payback_months": null,
@@ -5649,8 +5649,8 @@
      "salesLakhPerMonth": 0.02
     }
    ],
-   "capacity_orders_month": 900,
-   "capacity_use_pct": 0,
+   "capacity_orders_month": 600,
+   "capacity_use_pct": 1,
    "est_sales_lakh_month": 0.1,
    "est_profit_lakh_month": -1.86,
    "payback_months": null,

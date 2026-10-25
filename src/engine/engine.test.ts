@@ -158,9 +158,17 @@ describe('engine on the sample file', () => {
   });
   it('never puts two stores in one pin (existing stores included)', () => {
     expect(out.summary.pinConflicts).toBe(0);
+    // One store per approved unit: a solo partner at their pin, an allocated pair once at the pair's site.
     const pins: string[] = [...STORE_PINS];
+    const pairsSeen = new Set<string>();
     for (const r of out.results) {
-      if (APPROVED.has(r.decision)) pins.push(r.pin!);
+      if (APPROVED.has(r.decision)) {
+        if (r.partnership?.status === 'allocated') {
+          if (pairsSeen.has(r.partnership.id)) continue;
+          pairsSeen.add(r.partnership.id);
+          pins.push(out.partnerships.find((p) => p.id === r.partnership!.id)!.pin);
+        } else pins.push(r.pin!);
+      }
       if (r.decision === 'Redirect') pins.push(r.redirect!.pin);
     }
     expect(new Set(pins).size).toBe(pins.length);
@@ -191,7 +199,12 @@ describe('engine on the sample file', () => {
       expect(APPROVED.has(r.decision)).toBe(false);
       if (r.decision === 'Redirect') expect(STORE_PINS.has(r.redirect!.pin)).toBe(false);
     }
-    for (const r of out.results) if (APPROVED.has(r.decision)) expect(STORE_PINS.has(r.pin!)).toBe(false);
+    // The store site is the pair's site for allocated pairs (a member's own pin may be a store pin, e.g. APP-131 at 575001).
+    for (const r of out.results) {
+      if (!APPROVED.has(r.decision)) continue;
+      const site = r.partnership?.status === 'allocated' ? out.partnerships.find((p) => p.id === r.partnership!.id)!.pin : r.pin!;
+      expect(STORE_PINS.has(site)).toBe(false);
+    }
   });
   it('resolves the Tumakuru 572101 clash with at most one approval', () => {
     const both = [byId('APP-099'), byId('APP-150')];
@@ -224,12 +237,13 @@ describe('engine on the sample file', () => {
     expect(withDiwali[0].conditions.find((c) => c.code === 'FESTIVAL_CONFLICT')!.text).toMatch(/Jan 2027/);
   });
   it('declines 0-year applicants who miss the 0-year route', () => {
-    for (const id of ['APP-015', 'APP-160']) {
-      const r = byId(id);
-      expect(APPROVED.has(r.decision)).toBe(false);
-    }
+    expect(APPROVED.has(byId('APP-015').decision)).toBe(false);
+    // APP-160 fails the 0-year route alone; it may only be approved as the investor of an allocated pair
+    const a160 = byId('APP-160');
+    if (APPROVED.has(a160.decision)) expect(a160.partnership).toMatchObject({ role: 'investor', status: 'allocated' });
     for (const r of out.results) {
-      if (APPROVED.has(r.decision) && r.partnerBreakdown[0].score === 0) expect(r.conditions.some((c) => c.code === 'ZERO_EXPERIENCE')).toBe(true);
+      if (APPROVED.has(r.decision) && r.partnerBreakdown[0].score === 0 && r.partnership?.status !== 'allocated')
+        expect(r.conditions.some((c) => c.code === 'ZERO_EXPERIENCE')).toBe(true);
     }
   });
   it('gives launch plans only to approved partners, with ADKAR and dated steps', () => {

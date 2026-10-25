@@ -10,3 +10,4 @@ scratch/
 hubspot-app/.hsaccount
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+.claude/

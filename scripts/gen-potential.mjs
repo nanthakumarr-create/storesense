@@ -19,8 +19,8 @@ const FAR_TRAVEL_KM = 4; // store orders from further than this count as redirec
 const T1 = { investmentLakh: 35, baseSalesLakh: 9.5, fixedCostLakh: 1.9 }; // rules.ts TIER_ECONOMICS['Tier 1']
 const CONTRIBUTION_MARGIN = 0.35; // rules.ts
 const PAYBACK_TARGET = 30;
-// A standard 400-600 sq ft store with one eye-test room: ~30 customer orders a day, 30 days → 900 a month.
-const CAPACITY_ORDERS_PER_MONTH = 900;
+// A standard 400-600 sq ft store with one eye-test room: ~20 customer orders a day (eye test ≈ 20-30 min), 30 days → 600 a month.
+const CAPACITY_ORDERS_PER_MONTH = 600;
 
 const storeShare = (d) => WALKIN.share * Math.exp(-d / WALKIN.decayKm) + PICKUP.share * Math.exp(-d / PICKUP.decayKm);
 const rad = (x) => (x * Math.PI) / 180;
@@ -75,23 +75,52 @@ for (const o of orders) {
   }
 }
 
+// ---------- store load today (actual simulated store orders, last 12 months, scaled, per month) ----------
+const storeLoad = Object.fromEntries(stores.map((s) => [s.id, 0]));
+const baselineFlows = new Map(); // "homePin|store" → orders
+for (const o of storeOrders) {
+  storeLoad[o.store_id] += SCALE / 12;
+  baselineFlows.set(`${o.home_pin}|${o.store_id}`, (baselineFlows.get(`${o.home_pin}|${o.store_id}`) || 0) + SCALE / 12);
+}
+const candidateFlows = {};
+
 // ---------- potential new store at each pin ----------
 const out = pins.map((p) => {
   let captured = 0, incremental = 0, catchmentCustomers = 0;
   const cannibal = {};
+  const flowMap = new Map(); // "homePin|fromStore" → { taken, gained }
+  const switchDists = [];
   for (const c of customers) {
     const f = freq.get(c.customer_id) || 0;
     if (!f) continue;
     const dNew = Math.max(NEAR_STORE_KM * 0.5, km(c, p));
     if (dNew >= c.nearest_store_km) continue; // the new store is not their closest → no change
     catchmentCustomers++;
+    switchDists.push(dNew);
     const before = f * storeShare(c.nearest_store_km);
     const after = f * storeShare(dNew);
     captured += after;
     incremental += after - before;
     const prevStore = nearestStore(c).s.id;
     cannibal[prevStore] = (cannibal[prevStore] || 0) + before;
+    const key = `${c.home_pin}|${prevStore}`;
+    const fl = flowMap.get(key) ?? { taken: 0, gained: 0 };
+    fl.taken += before;
+    fl.gained += after - before;
+    flowMap.set(key, fl);
   }
+  switchDists.sort((a, b) => a - b);
+  candidateFlows[p.pin] = {
+    catchment_radius_km: switchDists.length ? round(switchDists[Math.floor(switchDists.length * 0.8)], 2) : 0,
+    flows: [...flowMap.entries()]
+      .map(([k, v]) => {
+        const [pin, fromStore] = k.split('|');
+        return { pin, fromStore, takenPerMonth: round((v.taken * SCALE) / 12), newPerMonth: round((v.gained * SCALE) / 12) };
+      })
+      .filter((x) => x.takenPerMonth + x.newPerMonth >= 1)
+      .sort((a, b) => b.takenPerMonth + b.newPerMonth - (a.takenPerMonth + a.newPerMonth)),
+    store_load_after: Object.fromEntries(stores.map((s) => [s.id, round(storeLoad[s.id] - ((cannibal[s.id] || 0) * SCALE) / 12)])),
+  };
   const near = nearestStore(p);
   const t = today.get(p.pin);
   // Scale sample → real and to a monthly figure
@@ -152,10 +181,28 @@ const meta = {
     'Missed orders: store purchases a pin\'s customers would make if a store were in their own pin, minus what they make today (they buy online instead or not at all).',
     'Redirected orders: store purchases made by travelling more than 4 km to a far store.',
     'New-store potential: customers for whom the new store would be the closest; their store purchases rise as travel distance falls. Purchases they made at an existing store count as taken from that store (cannibalisation).',
-    'Capacity: one standard store (400-600 sq ft, one eye-test room) handles about 30 orders a day (900 a month).',
+    'Capacity: one standard store (400-600 sq ft, one eye-test room) handles about 20 orders a day (600 a month).',
   ],
 };
 fs.writeFileSync(path.join(root, 'src/data/blr-potential.json'), JSON.stringify({ meta, pins: out }, null, 1));
+
+// Traffic flows for the map (fetched lazily from /blr-flows.json): who feeds which store today, and how a new store would split it.
+const flows = {
+  meta: { ...meta, unit: 'orders per month (scaled)' },
+  stores: stores.map((s) => ({
+    id: s.id, area: s.area, lat: s.lat, lng: s.lng,
+    load_per_month: round(storeLoad[s.id]),
+    capacity_per_month: CAPACITY_ORDERS_PER_MONTH,
+    utilisation_pct: round((100 * storeLoad[s.id]) / CAPACITY_ORDERS_PER_MONTH),
+  })),
+  baseline: [...baselineFlows.entries()]
+    .map(([k, v]) => { const [pin, store] = k.split('|'); return { pin, store, perMonth: round(v) }; })
+    .filter((x) => x.perMonth >= 1),
+  pins: Object.fromEntries(out.map((o) => [o.pin, { online: o.online_orders_month, missed: o.missed_orders_month, store: o.store_orders_month, redirected: o.redirected_orders_month }])),
+  candidates: candidateFlows,
+};
+fs.writeFileSync(path.join(root, 'public/blr-flows.json'), JSON.stringify(flows));
+console.log('store load today:', flows.stores.map((s) => `${s.id} ${s.area} ${s.load_per_month}/mo (${s.utilisation_pct}%)`).join(' | '));
 
 console.log(`scale x${meta.sample_scale}, store AOV ₹${meta.store_aov_inr}`);
 const viable = out.filter((o) => o.verdict !== 'Existing store here').sort((a, b) => b.incremental_orders_month - a.incremental_orders_month);

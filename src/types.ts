@@ -200,8 +200,38 @@ export interface Redirect {
   paybackMonths: number | null;
 }
 
+/**
+ * Two applicants in the same territory who cover each other's gap: an OPERATOR (retail experience, short of money)
+ * and an INVESTOR (money, little or no experience). The operator runs the store day to day; the investor funds it.
+ */
+export interface Partnership {
+  id: string; // e.g. "PAIR-APP-038+APP-015"
+  operatorUid: string;
+  operatorAppId: string;
+  operatorName: string;
+  investorUid: string;
+  investorAppId: string;
+  investorName: string;
+  territoryId: string | null;
+  pin: string; // where the joint store would open (the operator's or investor's site, whichever is better)
+  pinName: string;
+  combinedInvestmentLakh: number;
+  totalCashNeedLakh: number;
+  partnerScore: number; // joint partner score
+  breakdown: ScoreItem[]; // joint breakdown (experience/relevance from operator, capital from both, ...)
+  placeScore: number;
+  paybackMonths: number | null;
+  combinedScore: number;
+  rankInTerritory: number | null; // where the pair would rank among the territory's contenders
+  covers: string[]; // plain sentences: what each one brings and which gap it closes
+  status: 'allocated' | 'suggested'; // allocated = the pair won a slot and both are approved as a pair
+  outcome: string; // one plain sentence for the operator
+}
+
 export interface Result {
   uid: string;
+  /** Set when this applicant is part of a suggested or allocated partnership. */
+  partnership: { id: string; role: 'operator' | 'investor'; withUid: string; withAppId: string; withName: string; status: Partnership['status'] } | null;
   appId: string;
   name: string;
   city: string;
@@ -265,6 +295,7 @@ export interface EngineOutput {
   results: Result[];
   territories: TerritoryStatus[];
   gaps: GapPin[];
+  partnerships: Partnership[];
   summary: EngineSummary;
   asOf: string; // AS_OF_DATE used for every date calculation
   hash: string; // deterministic fingerprint of the decisions

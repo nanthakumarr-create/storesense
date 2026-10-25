@@ -57,7 +57,14 @@ describe('sample file invariants', () => {
   });
 
   it('approvals never contradict their own numbers', () => {
-    for (const r of out.results.filter((x) => APPROVED.has(x.decision))) {
+    // Allocated pairs are judged on the joint numbers (members' own "on their own" context lines are expected)
+    for (const p of out.partnerships.filter((x) => x.status === 'allocated')) {
+      expect(p.paybackMonths).not.toBeNull();
+      expect(p.paybackMonths!).toBeLessThanOrEqual(30);
+      expect(p.combinedInvestmentLakh).toBeGreaterThanOrEqual(p.totalCashNeedLakh);
+      expect(STORE_PINS.has(p.pin)).toBe(false);
+    }
+    for (const r of out.results.filter((x) => APPROVED.has(x.decision) && x.partnership?.status !== 'allocated')) {
       expect(r.economics.paybackPass).toBe(true);
       expect(r.reasons.join(' ')).not.toMatch(/over the 30-month target|below the 55 bar|Over 30% short/);
       expect(r.economics.capitalGapPct).toBeLessThanOrEqual(0.3);
@@ -68,13 +75,18 @@ describe('sample file invariants', () => {
 
   it('counts approvals, redirects-in and held slots per territory within open slots', () => {
     for (const t of parsed.territories) {
-      const used = out.results.filter(
-        (r) =>
-          (APPROVED.has(r.decision) && r.territoryId === t.id) ||
-          (r.decision === 'Redirect' && r.redirect!.territoryId === t.id) ||
-          (r.decision === 'Hold' && r.reasonCodes.includes('SLOT_HELD') && r.territoryId === t.id),
+      // Count slot-using units: an allocated pair uses one slot for two people
+      const used = new Set(
+        out.results
+          .filter(
+            (r) =>
+              (APPROVED.has(r.decision) && (r.partnership?.status === 'allocated' ? out.partnerships.find((p) => p.id === r.partnership!.id)!.territoryId : r.territoryId) === t.id) ||
+              (r.decision === 'Redirect' && r.redirect!.territoryId === t.id) ||
+              (r.decision === 'Hold' && r.reasonCodes.includes('SLOT_HELD') && r.territoryId === t.id),
+          )
+          .map((r) => (r.partnership?.status === 'allocated' && APPROVED.has(r.decision) ? r.partnership.id : r.uid)),
       );
-      expect(used.length).toBeLessThanOrEqual(t.openSlots);
+      expect(used.size).toBeLessThanOrEqual(t.openSlots);
     }
   });
 
@@ -99,7 +111,9 @@ describe('sample file invariants', () => {
 
   it('explains exactly why no redirect was offered', () => {
     for (const r of out.results.filter((x) => x.reasonCodes.includes('NO_FREE_PIN_NEARBY'))) expect(r.reasons.join(' ')).toMatch(/no redirect was offered/);
-    expect(byId('APP-184').reasons.join(' ')).toMatch(/would carry 3 conditions/);
+    // TER-10's slot now goes to a pair, so APP-184 (on store pin 580020) finds every workable territory full
+    expect(byId('APP-184').headline).toMatch(/already has store ST-09/);
+    expect(byId('APP-184').headline).toMatch(/workable pin are full|would carry/);
     expect(byId('APP-166').headline).toMatch(/territories with a workable pin are full/);
   });
 
@@ -117,7 +131,8 @@ describe('sample file invariants', () => {
   it('describes redirects in the territory reason correctly', () => {
     const t9 = out.territories.find((t) => t.id === 'TER-09')!;
     expect(t9.reason).not.toMatch(/moved to .* after a pin clash\) won/);
-    expect(t9.reason).toMatch(/already has a store/);
+    // TER-09's slot goes to a pair whose site (575004) is a free pin, not the store pin 575001
+    expect(t9.reason).toMatch(/as a pair/);
   });
 
   it('a chat "still searching" update drops the stale size and lifts the APP-158 Hold', () => {
@@ -130,7 +145,9 @@ describe('sample file invariants', () => {
   it('produces a sensible spread for 200 applicants vs 21 slots', () => {
     const b = out.summary.byDecision;
     const held = out.results.filter((r) => r.reasonCodes.includes('SLOT_HELD')).length;
-    expect(b.Approve + b['Approve with conditions'] + b.Redirect + held).toBe(out.summary.slotsFilled);
+    const allocatedPairs = out.partnerships.filter((p) => p.status === 'allocated').length;
+    // each allocated pair is two approved people in one slot
+    expect(b.Approve + b['Approve with conditions'] - allocatedPairs + b.Redirect + held).toBe(out.summary.slotsFilled);
     expect(b.Waitlist).toBeGreaterThan(20);
     expect(b.Decline).toBeLessThan(out.results.length * 0.6);
     expect(b.Hold).toBeLessThan(20);
