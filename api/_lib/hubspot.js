@@ -35,7 +35,9 @@ const STAGE_FOR = {
 };
 
 export function hubspotToken(env = process.env) {
-  return env.HUBSPOT_ACCESS_TOKEN || null;
+  // Strip a byte-order mark / whitespace that some shells add when the value is piped in
+  const t = (env.HUBSPOT_ACCESS_TOKEN || '').replace(/^﻿/, '').trim();
+  return t || null;
 }
 
 async function hs(token, method, path, body) {
