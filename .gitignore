@@ -11,3 +11,6 @@ hubspot-app/.hsaccount
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 .claude/
+
+.vercel
+.env*
