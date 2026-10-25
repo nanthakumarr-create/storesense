@@ -1,0 +1,1082 @@
+[
+ {
+  "pin": "560001",
+  "name": "Bengaluru",
+  "division": "BENGALURU GPO",
+  "lat": 12.9814,
+  "lng": 77.59439,
+  "areaKm2": 8.17,
+  "distanceFromCentreKm": 0.46,
+  "zone": "core"
+ },
+ {
+  "pin": "560002",
+  "name": "Bengaluru City",
+  "division": "Bengaluru West",
+  "lat": 12.96323,
+  "lng": 77.57942,
+  "areaKm2": 2.08,
+  "distanceFromCentreKm": 2.17,
+  "zone": "core"
+ },
+ {
+  "pin": "560003",
+  "name": "Malleswaram",
+  "division": "Bengaluru West",
+  "lat": 13.00043,
+  "lng": 77.57296,
+  "areaKm2": 2.92,
+  "distanceFromCentreKm": 3.03,
+  "zone": "core"
+ },
+ {
+  "pin": "560004",
+  "name": "Basavanagudi",
+  "division": "Bengaluru South",
+  "lat": 12.94589,
+  "lng": 77.57342,
+  "areaKm2": 5.6,
+  "distanceFromCentreKm": 4.17,
+  "zone": "core"
+ },
+ {
+  "pin": "560005",
+  "name": "Fraser Town",
+  "division": "Bengaluru East",
+  "lat": 12.99922,
+  "lng": 77.61789,
+  "areaKm2": 3.84,
+  "distanceFromCentreKm": 3.68,
+  "zone": "core"
+ },
+ {
+  "pin": "560006",
+  "name": "J C Nagar",
+  "division": "Bengaluru East",
+  "lat": 13.00689,
+  "lng": 77.59591,
+  "areaKm2": 6.52,
+  "distanceFromCentreKm": 3.11,
+  "zone": "core"
+ },
+ {
+  "pin": "560007",
+  "name": "Agram",
+  "division": "Bengaluru East",
+  "lat": 12.94656,
+  "lng": 77.63676,
+  "areaKm2": 8.19,
+  "distanceFromCentreKm": 6.18,
+  "zone": "inner"
+ },
+ {
+  "pin": "560008",
+  "name": "H A L II Stage",
+  "division": "Bengaluru East",
+  "lat": 12.97058,
+  "lng": 77.63534,
+  "areaKm2": 5.62,
+  "distanceFromCentreKm": 4.93,
+  "zone": "core"
+ },
+ {
+  "pin": "560009",
+  "name": "K. G. Road",
+  "division": "Bengaluru West",
+  "lat": 12.97776,
+  "lng": 77.57705,
+  "areaKm2": 1.36,
+  "distanceFromCentreKm": 1.49,
+  "zone": "core"
+ },
+ {
+  "pin": "560010",
+  "name": "Rajajinagar",
+  "division": "Bengaluru West",
+  "lat": 12.99137,
+  "lng": 77.55237,
+  "areaKm2": 4.61,
+  "distanceFromCentreKm": 4.36,
+  "zone": "core"
+ },
+ {
+  "pin": "560011",
+  "name": "Jayangar III Block",
+  "division": "Bengaluru South",
+  "lat": 12.93626,
+  "lng": 77.58789,
+  "areaKm2": 3.68,
+  "distanceFromCentreKm": 4.81,
+  "zone": "core"
+ },
+ {
+  "pin": "560012",
+  "name": "Science Institute",
+  "division": "Bengaluru West",
+  "lat": 13.01918,
+  "lng": 77.56656,
+  "areaKm2": 2.26,
+  "distanceFromCentreKm": 5.14,
+  "zone": "inner"
+ },
+ {
+  "pin": "560013",
+  "name": "Jalahalli",
+  "division": "Bengaluru West",
+  "lat": 13.05554,
+  "lng": 77.5466,
+  "areaKm2": 9.87,
+  "distanceFromCentreKm": 9.72,
+  "zone": "inner"
+ },
+ {
+  "pin": "560015",
+  "name": "Jalahalli West",
+  "division": "Bengaluru West",
+  "lat": 13.05767,
+  "lng": 77.52592,
+  "areaKm2": 5.21,
+  "distanceFromCentreKm": 11.18,
+  "zone": "inner"
+ },
+ {
+  "pin": "560016",
+  "name": "Doorvaninagar",
+  "division": "Bengaluru East",
+  "lat": 13.01102,
+  "lng": 77.67608,
+  "areaKm2": 12.51,
+  "distanceFromCentreKm": 9.9,
+  "zone": "inner"
+ },
+ {
+  "pin": "560017",
+  "name": "Vimanapura",
+  "division": "Bengaluru East",
+  "lat": 12.9584,
+  "lng": 77.66423,
+  "areaKm2": 6.01,
+  "distanceFromCentreKm": 8.3,
+  "zone": "inner"
+ },
+ {
+  "pin": "560018",
+  "name": "Chamrajpet",
+  "division": "Bengaluru South",
+  "lat": 12.9592,
+  "lng": 77.56258,
+  "areaKm2": 2.79,
+  "distanceFromCentreKm": 3.79,
+  "zone": "core"
+ },
+ {
+  "pin": "560020",
+  "name": "Seshadripuram",
+  "division": "Bengaluru West",
+  "lat": 12.99135,
+  "lng": 77.57738,
+  "areaKm2": 1.1,
+  "distanceFromCentreKm": 1.96,
+  "zone": "core"
+ },
+ {
+  "pin": "560021",
+  "name": "Srirampuram",
+  "division": "Bengaluru West",
+  "lat": 12.99277,
+  "lng": 77.56287,
+  "areaKm2": 2.54,
+  "distanceFromCentreKm": 3.36,
+  "zone": "core"
+ },
+ {
+  "pin": "560022",
+  "name": "Yeswanthpura",
+  "division": "Bengaluru West",
+  "lat": 13.02767,
+  "lng": 77.54424,
+  "areaKm2": 6.54,
+  "distanceFromCentreKm": 7.36,
+  "zone": "inner"
+ },
+ {
+  "pin": "560023",
+  "name": "Magadi Road",
+  "division": "Bengaluru West",
+  "lat": 12.97369,
+  "lng": 77.55937,
+  "areaKm2": 3.52,
+  "distanceFromCentreKm": 3.45,
+  "zone": "core"
+ },
+ {
+  "pin": "560024",
+  "name": "H A Farm",
+  "division": "Bengaluru East",
+  "lat": 13.04595,
+  "lng": 77.59804,
+  "areaKm2": 6.28,
+  "distanceFromCentreKm": 7.44,
+  "zone": "inner"
+ },
+ {
+  "pin": "560025",
+  "name": "Museum Road",
+  "division": "Bengaluru East",
+  "lat": 12.96546,
+  "lng": 77.60682,
+  "areaKm2": 2.7,
+  "distanceFromCentreKm": 2.34,
+  "zone": "core"
+ },
+ {
+  "pin": "560026",
+  "name": "Governmemnt Electric Factory",
+  "division": "Bengaluru South",
+  "lat": 12.94864,
+  "lng": 77.53427,
+  "areaKm2": 8.5,
+  "distanceFromCentreKm": 7.01,
+  "zone": "inner"
+ },
+ {
+  "pin": "560027",
+  "name": "Wilson Garden",
+  "division": "Bengaluru South",
+  "lat": 12.9571,
+  "lng": 77.59276,
+  "areaKm2": 3.3,
+  "distanceFromCentreKm": 2.49,
+  "zone": "core"
+ },
+ {
+  "pin": "560029",
+  "name": "Dharmaram College",
+  "division": "Bengaluru South",
+  "lat": 12.92837,
+  "lng": 77.60475,
+  "areaKm2": 3.72,
+  "distanceFromCentreKm": 5.87,
+  "zone": "inner"
+ },
+ {
+  "pin": "560030",
+  "name": "Adugodi",
+  "division": "Bengaluru South",
+  "lat": 12.94589,
+  "lng": 77.60731,
+  "areaKm2": 3.71,
+  "distanceFromCentreKm": 4.14,
+  "zone": "core"
+ },
+ {
+  "pin": "560032",
+  "name": "R T Nagar",
+  "division": "Bengaluru East",
+  "lat": 13.02532,
+  "lng": 77.59952,
+  "areaKm2": 6.21,
+  "distanceFromCentreKm": 5.19,
+  "zone": "inner"
+ },
+ {
+  "pin": "560033",
+  "name": "Maruthi Sevanagar",
+  "division": "Bengaluru East",
+  "lat": 13.00315,
+  "lng": 77.64071,
+  "areaKm2": 4.35,
+  "distanceFromCentreKm": 6.03,
+  "zone": "inner"
+ },
+ {
+  "pin": "560034",
+  "name": "Koramangala",
+  "division": "Bengaluru South",
+  "lat": 12.92608,
+  "lng": 77.62927,
+  "areaKm2": 3.84,
+  "distanceFromCentreKm": 7.25,
+  "zone": "inner"
+ },
+ {
+  "pin": "560035",
+  "name": "Carmelram",
+  "division": "Bengaluru South",
+  "lat": 12.9022,
+  "lng": 77.70007,
+  "areaKm2": 23.67,
+  "distanceFromCentreKm": 14.63,
+  "zone": "outer"
+ },
+ {
+  "pin": "560036",
+  "name": "Krishnarajapuram",
+  "division": "Bengaluru East",
+  "lat": 13.02292,
+  "lng": 77.69978,
+  "areaKm2": 12.75,
+  "distanceFromCentreKm": 12.77,
+  "zone": "outer"
+ },
+ {
+  "pin": "560037",
+  "name": "Marathahalli Colony",
+  "division": "Bengaluru East",
+  "lat": 12.95493,
+  "lng": 77.68908,
+  "areaKm2": 22.23,
+  "distanceFromCentreKm": 11,
+  "zone": "inner"
+ },
+ {
+  "pin": "560038",
+  "name": "Indiranagar",
+  "division": "Bengaluru East",
+  "lat": 12.98882,
+  "lng": 77.64502,
+  "areaKm2": 5.25,
+  "distanceFromCentreKm": 5.98,
+  "zone": "inner"
+ },
+ {
+  "pin": "560040",
+  "name": "Vijayanagar",
+  "division": "Bengaluru West",
+  "lat": 12.96771,
+  "lng": 77.5347,
+  "areaKm2": 3.72,
+  "distanceFromCentreKm": 6.21,
+  "zone": "inner"
+ },
+ {
+  "pin": "560041",
+  "name": "Jayanagar",
+  "division": "Bengaluru South",
+  "lat": 12.92082,
+  "lng": 77.5905,
+  "areaKm2": 3.06,
+  "distanceFromCentreKm": 6.51,
+  "zone": "inner"
+ },
+ {
+  "pin": "560042",
+  "name": "Sivan Chetty Gardens",
+  "division": "Bengaluru East",
+  "lat": 12.98406,
+  "lng": 77.61827,
+  "areaKm2": 2.69,
+  "distanceFromCentreKm": 3.03,
+  "zone": "core"
+ },
+ {
+  "pin": "560043",
+  "name": "Kalyananagar",
+  "division": "Bengaluru East",
+  "lat": 13.02301,
+  "lng": 77.64254,
+  "areaKm2": 9.01,
+  "distanceFromCentreKm": 7.42,
+  "zone": "inner"
+ },
+ {
+  "pin": "560045",
+  "name": "Arabic College",
+  "division": "Bengaluru East",
+  "lat": 13.03559,
+  "lng": 77.6163,
+  "areaKm2": 7.86,
+  "distanceFromCentreKm": 6.84,
+  "zone": "inner"
+ },
+ {
+  "pin": "560047",
+  "name": "Viveknagar",
+  "division": "Bengaluru East",
+  "lat": 12.95056,
+  "lng": 77.62134,
+  "areaKm2": 3.66,
+  "distanceFromCentreKm": 4.62,
+  "zone": "core"
+ },
+ {
+  "pin": "560048",
+  "name": "Mahadevapura",
+  "division": "Bengaluru East",
+  "lat": 12.98949,
+  "lng": 77.70808,
+  "areaKm2": 11.31,
+  "distanceFromCentreKm": 12.77,
+  "zone": "outer"
+ },
+ {
+  "pin": "560049",
+  "name": "Virgonagar",
+  "division": "Bengaluru East",
+  "lat": 13.0598,
+  "lng": 77.72876,
+  "areaKm2": 66.93,
+  "distanceFromCentreKm": 17.43,
+  "zone": "outer"
+ },
+ {
+  "pin": "560050",
+  "name": "Banashankari",
+  "division": "Bengaluru South",
+  "lat": 12.94159,
+  "lng": 77.55546,
+  "areaKm2": 2.22,
+  "distanceFromCentreKm": 5.68,
+  "zone": "inner"
+ },
+ {
+  "pin": "560051",
+  "name": "H K P Road",
+  "division": "Bengaluru East",
+  "lat": 12.98846,
+  "lng": 77.6024,
+  "areaKm2": 1.1,
+  "distanceFromCentreKm": 1.62,
+  "zone": "core"
+ },
+ {
+  "pin": "560053",
+  "name": "Chickpet",
+  "division": "Bengaluru South",
+  "lat": 12.9696,
+  "lng": 77.57337,
+  "areaKm2": 1.15,
+  "distanceFromCentreKm": 2.17,
+  "zone": "core"
+ },
+ {
+  "pin": "560054",
+  "name": "Msrit",
+  "division": "Bengaluru West",
+  "lat": 13.03519,
+  "lng": 77.55738,
+  "areaKm2": 3.43,
+  "distanceFromCentreKm": 7.18,
+  "zone": "inner"
+ },
+ {
+  "pin": "560055",
+  "name": "Malleswaram West",
+  "division": "Bengaluru West",
+  "lat": 13.01053,
+  "lng": 77.5608,
+  "areaKm2": 1.3,
+  "distanceFromCentreKm": 4.74,
+  "zone": "core"
+ },
+ {
+  "pin": "560056",
+  "name": "Bengaluru vishwavidyalaya",
+  "division": "Bengaluru South",
+  "lat": 12.94856,
+  "lng": 77.49935,
+  "areaKm2": 9.77,
+  "distanceFromCentreKm": 10.48,
+  "zone": "inner"
+ },
+ {
+  "pin": "560057",
+  "name": "Peenya Dasarahalli",
+  "division": "Bengaluru West",
+  "lat": 13.05247,
+  "lng": 77.51289,
+  "areaKm2": 4.1,
+  "distanceFromCentreKm": 11.71,
+  "zone": "inner"
+ },
+ {
+  "pin": "560058",
+  "name": "Peenya Small Industries",
+  "division": "Bengaluru West",
+  "lat": 13.01948,
+  "lng": 77.51015,
+  "areaKm2": 15.46,
+  "distanceFromCentreKm": 9.8,
+  "zone": "inner"
+ },
+ {
+  "pin": "560059",
+  "name": "Rv Niketan",
+  "division": "Bengaluru South",
+  "lat": 12.92019,
+  "lng": 77.49934,
+  "areaKm2": 4.71,
+  "distanceFromCentreKm": 11.89,
+  "zone": "inner"
+ },
+ {
+  "pin": "560060",
+  "name": "Kengeri",
+  "division": "Bengaluru South",
+  "lat": 12.9203,
+  "lng": 77.46834,
+  "areaKm2": 43.48,
+  "distanceFromCentreKm": 14.8,
+  "zone": "outer"
+ },
+ {
+  "pin": "560061",
+  "name": "Subramanyapura",
+  "division": "Bengaluru South",
+  "lat": 12.90216,
+  "lng": 77.54161,
+  "areaKm2": 9.78,
+  "distanceFromCentreKm": 10.1,
+  "zone": "inner"
+ },
+ {
+  "pin": "560062",
+  "name": "Doddakallasandra",
+  "division": "Bengaluru South",
+  "lat": 12.88254,
+  "lng": 77.56256,
+  "areaKm2": 5.24,
+  "distanceFromCentreKm": 11.19,
+  "zone": "inner"
+ },
+ {
+  "pin": "560063",
+  "name": "A F Station Yelahanka",
+  "division": "Bengaluru East",
+  "lat": 13.13203,
+  "lng": 77.61383,
+  "areaKm2": 6.21,
+  "distanceFromCentreKm": 17.16,
+  "zone": "outer"
+ },
+ {
+  "pin": "560064",
+  "name": "Yelahanka",
+  "division": "Bengaluru East",
+  "lat": 13.10134,
+  "lng": 77.60538,
+  "areaKm2": 52.62,
+  "distanceFromCentreKm": 13.65,
+  "zone": "outer"
+ },
+ {
+  "pin": "560065",
+  "name": "G K V K",
+  "division": "Bengaluru East",
+  "lat": 13.08347,
+  "lng": 77.5769,
+  "areaKm2": 7.48,
+  "distanceFromCentreKm": 11.67,
+  "zone": "inner"
+ },
+ {
+  "pin": "560066",
+  "name": "Whitefield",
+  "division": "Bengaluru East",
+  "lat": 12.97077,
+  "lng": 77.74266,
+  "areaKm2": 23.98,
+  "distanceFromCentreKm": 16.49,
+  "zone": "outer"
+ },
+ {
+  "pin": "560067",
+  "name": "Kadugodi",
+  "division": "Bengaluru East",
+  "lat": 13.00196,
+  "lng": 77.78107,
+  "areaKm2": 28.22,
+  "distanceFromCentreKm": 20.78,
+  "zone": "outer"
+ },
+ {
+  "pin": "560068",
+  "name": "Bommanahalli",
+  "division": "Bengaluru South",
+  "lat": 12.89758,
+  "lng": 77.63908,
+  "areaKm2": 10.97,
+  "distanceFromCentreKm": 10.5,
+  "zone": "inner"
+ },
+ {
+  "pin": "560070",
+  "name": "B Sk II Stage",
+  "division": "Bengaluru South",
+  "lat": 12.92265,
+  "lng": 77.567,
+  "areaKm2": 6.16,
+  "distanceFromCentreKm": 6.81,
+  "zone": "inner"
+ },
+ {
+  "pin": "560071",
+  "name": "Domlur",
+  "division": "Bengaluru East",
+  "lat": 12.95767,
+  "lng": 77.63953,
+  "areaKm2": 1.62,
+  "distanceFromCentreKm": 5.82,
+  "zone": "inner"
+ },
+ {
+  "pin": "560072",
+  "name": "Nagarbhavi",
+  "division": "Bengaluru West",
+  "lat": 12.96688,
+  "lng": 77.51542,
+  "areaKm2": 7,
+  "distanceFromCentreKm": 8.28,
+  "zone": "inner"
+ },
+ {
+  "pin": "560073",
+  "name": "Nagasandra",
+  "division": "Bengaluru West",
+  "lat": 13.04715,
+  "lng": 77.49168,
+  "areaKm2": 16.98,
+  "distanceFromCentreKm": 13.11,
+  "zone": "outer"
+ },
+ {
+  "pin": "560074",
+  "name": "Kumbalagodu",
+  "division": "Bengaluru South",
+  "lat": 12.87809,
+  "lng": 77.4429,
+  "areaKm2": 63.22,
+  "distanceFromCentreKm": 19.58,
+  "zone": "outer"
+ },
+ {
+  "pin": "560075",
+  "name": "New Thippasandra",
+  "division": "Bengaluru East",
+  "lat": 12.9736,
+  "lng": 77.66202,
+  "areaKm2": 4.97,
+  "distanceFromCentreKm": 7.75,
+  "zone": "inner"
+ },
+ {
+  "pin": "560076",
+  "name": "Bannerghatta Road",
+  "division": "Bengaluru South",
+  "lat": 12.88716,
+  "lng": 77.601,
+  "areaKm2": 16.14,
+  "distanceFromCentreKm": 10.32,
+  "zone": "inner"
+ },
+ {
+  "pin": "560077",
+  "name": "Dr. Shivarama Karanth Nagar",
+  "division": "Bengaluru East",
+  "lat": 13.07403,
+  "lng": 77.66183,
+  "areaKm2": 38.81,
+  "distanceFromCentreKm": 13.04,
+  "zone": "outer"
+ },
+ {
+  "pin": "560078",
+  "name": "J P Nagar",
+  "division": "Bengaluru South",
+  "lat": 12.90038,
+  "lng": 77.58374,
+  "areaKm2": 8.99,
+  "distanceFromCentreKm": 8.82,
+  "zone": "inner"
+ },
+ {
+  "pin": "560079",
+  "name": "Basaveshwaranagar",
+  "division": "Bengaluru West",
+  "lat": 12.98776,
+  "lng": 77.53282,
+  "areaKm2": 6.59,
+  "distanceFromCentreKm": 6.34,
+  "zone": "inner"
+ },
+ {
+  "pin": "560080",
+  "name": "Sadashivanagar",
+  "division": "Bengaluru East",
+  "lat": 13.01157,
+  "lng": 77.5796,
+  "areaKm2": 2.21,
+  "distanceFromCentreKm": 3.77,
+  "zone": "core"
+ },
+ {
+  "pin": "560081",
+  "name": "Chandapura",
+  "division": "Bengaluru South",
+  "lat": 12.79792,
+  "lng": 77.70506,
+  "areaKm2": 7.11,
+  "distanceFromCentreKm": 23.68,
+  "zone": "outer"
+ },
+ {
+  "pin": "560082",
+  "name": "Udaypura",
+  "division": "Bengaluru South",
+  "lat": 12.82628,
+  "lng": 77.51194,
+  "areaKm2": 13.53,
+  "distanceFromCentreKm": 19.05,
+  "zone": "outer"
+ },
+ {
+  "pin": "560083",
+  "name": "Bannerghatta",
+  "division": "Bengaluru South",
+  "lat": 12.77937,
+  "lng": 77.57929,
+  "areaKm2": 146.55,
+  "distanceFromCentreKm": 22.28,
+  "zone": "outer"
+ },
+ {
+  "pin": "560084",
+  "name": "St. Thomas Town",
+  "division": "Bengaluru East",
+  "lat": 13.01301,
+  "lng": 77.62745,
+  "areaKm2": 3.34,
+  "distanceFromCentreKm": 5.46,
+  "zone": "inner"
+ },
+ {
+  "pin": "560085",
+  "name": "Banashankari III Stage",
+  "division": "Bengaluru South",
+  "lat": 12.93066,
+  "lng": 77.5439,
+  "areaKm2": 7.16,
+  "distanceFromCentreKm": 7.42,
+  "zone": "inner"
+ },
+ {
+  "pin": "560086",
+  "name": "Mahalakshmipuram Layout",
+  "division": "Bengaluru West",
+  "lat": 13.00439,
+  "lng": 77.54124,
+  "areaKm2": 2.6,
+  "distanceFromCentreKm": 6.04,
+  "zone": "inner"
+ },
+ {
+  "pin": "560087",
+  "name": "Vartur",
+  "division": "Bengaluru East",
+  "lat": 12.93235,
+  "lng": 77.75924,
+  "areaKm2": 52.14,
+  "distanceFromCentreKm": 19,
+  "zone": "outer"
+ },
+ {
+  "pin": "560088",
+  "name": "Hessarghatta",
+  "division": "Bengaluru West",
+  "lat": 13.15303,
+  "lng": 77.47215,
+  "areaKm2": 15.06,
+  "distanceFromCentreKm": 23.19,
+  "zone": "outer"
+ },
+ {
+  "pin": "560089",
+  "name": "Hessarghatta Lake",
+  "division": "Bengaluru West",
+  "lat": 13.14751,
+  "lng": 77.50745,
+  "areaKm2": 52.55,
+  "distanceFromCentreKm": 20.75,
+  "zone": "outer"
+ },
+ {
+  "pin": "560090",
+  "name": "Chikkabanavara",
+  "division": "Bengaluru West",
+  "lat": 13.09261,
+  "lng": 77.50406,
+  "areaKm2": 18.13,
+  "distanceFromCentreKm": 15.7,
+  "zone": "outer"
+ },
+ {
+  "pin": "560091",
+  "name": "Viswaneedam",
+  "division": "Bengaluru West",
+  "lat": 12.98999,
+  "lng": 77.48671,
+  "areaKm2": 25.78,
+  "distanceFromCentreKm": 11.33,
+  "zone": "inner"
+ },
+ {
+  "pin": "560092",
+  "name": "Sahakaranagar",
+  "division": "Bengaluru East",
+  "lat": 13.05991,
+  "lng": 77.59007,
+  "areaKm2": 8.11,
+  "distanceFromCentreKm": 8.95,
+  "zone": "inner"
+ },
+ {
+  "pin": "560093",
+  "name": "C V Raman Nagar",
+  "division": "Bengaluru East",
+  "lat": 12.98446,
+  "lng": 77.66773,
+  "areaKm2": 5.02,
+  "distanceFromCentreKm": 8.37,
+  "zone": "inner"
+ },
+ {
+  "pin": "560094",
+  "name": "R M V Extension II Stage",
+  "division": "Bengaluru East",
+  "lat": 13.03876,
+  "lng": 77.57421,
+  "areaKm2": 5.27,
+  "distanceFromCentreKm": 6.84,
+  "zone": "inner"
+ },
+ {
+  "pin": "560095",
+  "name": "Koramangala VI Bk",
+  "division": "Bengaluru South",
+  "lat": 12.93794,
+  "lng": 77.61938,
+  "areaKm2": 1.88,
+  "distanceFromCentreKm": 5.56,
+  "zone": "inner"
+ },
+ {
+  "pin": "560096",
+  "name": "Nandinilayout",
+  "division": "Bengaluru West",
+  "lat": 13.01438,
+  "lng": 77.53452,
+  "areaKm2": 2.88,
+  "distanceFromCentreKm": 7.22,
+  "zone": "inner"
+ },
+ {
+  "pin": "560097",
+  "name": "Vidyaranyapura",
+  "division": "Bengaluru West",
+  "lat": 13.08455,
+  "lng": 77.54938,
+  "areaKm2": 17.6,
+  "distanceFromCentreKm": 12.52,
+  "zone": "outer"
+ },
+ {
+  "pin": "560098",
+  "name": "Rajarajeshwarinagar",
+  "division": "Bengaluru South",
+  "lat": 12.915,
+  "lng": 77.51915,
+  "areaKm2": 10.8,
+  "distanceFromCentreKm": 10.55,
+  "zone": "inner"
+ },
+ {
+  "pin": "560099",
+  "name": "Bommasandra Industrial Estate",
+  "division": "Bengaluru South",
+  "lat": 12.84163,
+  "lng": 77.70601,
+  "areaKm2": 50.53,
+  "distanceFromCentreKm": 19.77,
+  "zone": "outer"
+ },
+ {
+  "pin": "560100",
+  "name": "Electronics City",
+  "division": "Bengaluru South",
+  "lat": 12.85101,
+  "lng": 77.6649,
+  "areaKm2": 29.6,
+  "distanceFromCentreKm": 16.39,
+  "zone": "outer"
+ },
+ {
+  "pin": "560102",
+  "name": "HSR Layout",
+  "division": "Bengaluru South",
+  "lat": 12.91142,
+  "lng": 77.65408,
+  "areaKm2": 13.24,
+  "distanceFromCentreKm": 10.21,
+  "zone": "inner"
+ },
+ {
+  "pin": "560103",
+  "name": "Bellandur",
+  "division": "Bengaluru East",
+  "lat": 12.92999,
+  "lng": 77.68724,
+  "areaKm2": 8.63,
+  "distanceFromCentreKm": 11.82,
+  "zone": "inner"
+ },
+ {
+  "pin": "560104",
+  "name": "Hampinagar",
+  "division": "Bengaluru West",
+  "lat": 12.96248,
+  "lng": 77.53826,
+  "areaKm2": 1.11,
+  "distanceFromCentreKm": 5.99,
+  "zone": "inner"
+ },
+ {
+  "pin": "560105",
+  "name": "Jigani",
+  "division": "Bengaluru South",
+  "lat": 12.79038,
+  "lng": 77.64698,
+  "areaKm2": 65.7,
+  "distanceFromCentreKm": 21.89,
+  "zone": "outer"
+ },
+ {
+  "pin": "560107",
+  "name": "Achitnagar",
+  "division": "Bengaluru West",
+  "lat": 13.08697,
+  "lng": 77.48307,
+  "areaKm2": 6.37,
+  "distanceFromCentreKm": 16.7,
+  "zone": "outer"
+ },
+ {
+  "pin": "560108",
+  "name": "Anjanapura",
+  "division": "Bengaluru South",
+  "lat": 12.85299,
+  "lng": 77.55976,
+  "areaKm2": 11.17,
+  "distanceFromCentreKm": 14.45,
+  "zone": "outer"
+ },
+ {
+  "pin": "560109",
+  "name": "Thalaghattapura",
+  "division": "Bengaluru South",
+  "lat": 12.86464,
+  "lng": 77.52615,
+  "areaKm2": 28.15,
+  "distanceFromCentreKm": 14.55,
+  "zone": "outer"
+ },
+ {
+  "pin": "560110",
+  "name": "Ullalu Upanagar",
+  "division": "Bengaluru South",
+  "lat": 12.95039,
+  "lng": 77.47854,
+  "areaKm2": 5.12,
+  "distanceFromCentreKm": 12.57,
+  "zone": "outer"
+ },
+ {
+  "pin": "560111",
+  "name": "Kumaraswamy Layout",
+  "division": "Bengaluru South",
+  "lat": 12.90155,
+  "lng": 77.56307,
+  "areaKm2": 4.14,
+  "distanceFromCentreKm": 9.16,
+  "zone": "inner"
+ },
+ {
+  "pin": "560112",
+  "name": "Kodigehalli",
+  "division": "Bengaluru West",
+  "lat": 12.97373,
+  "lng": 77.45693,
+  "areaKm2": 7.8,
+  "distanceFromCentreKm": 14.51,
+  "zone": "outer"
+ },
+ {
+  "pin": "560113",
+  "name": "Horamavu",
+  "division": "Bengaluru East",
+  "lat": 13.03723,
+  "lng": 77.66237,
+  "areaKm2": 11.44,
+  "distanceFromCentreKm": 10.08,
+  "zone": "inner"
+ },
+ {
+  "pin": "560114",
+  "name": "Begur",
+  "division": "Bengaluru South",
+  "lat": 12.8736,
+  "lng": 77.62681,
+  "areaKm2": 14.97,
+  "distanceFromCentreKm": 12.4,
+  "zone": "outer"
+ },
+ {
+  "pin": "560115",
+  "name": "Kannamangala",
+  "division": "Bengaluru East",
+  "lat": 13.02531,
+  "lng": 77.76427,
+  "areaKm2": 13.57,
+  "distanceFromCentreKm": 19.49,
+  "zone": "outer"
+ },
+ {
+  "pin": "560116",
+  "name": "Kaggalipura P.O",
+  "division": "Bengaluru South",
+  "lat": 12.78236,
+  "lng": 77.50426,
+  "areaKm2": 48.87,
+  "distanceFromCentreKm": 23.83,
+  "zone": "outer"
+ },
+ {
+  "pin": "560117",
+  "name": "Doddadunnasandra",
+  "division": "Bengaluru East",
+  "lat": 12.95782,
+  "lng": 77.82866,
+  "areaKm2": 68.13,
+  "distanceFromCentreKm": 25.9,
+  "zone": "outer"
+ },
+ {
+  "pin": "560119",
+  "name": "Singanayakanahalli",
+  "division": "Bengaluru East",
+  "lat": 13.15435,
+  "lng": 77.55882,
+  "areaKm2": 40.29,
+  "distanceFromCentreKm": 19.76,
+  "zone": "outer"
+ },
+ {
+  "pin": "560300",
+  "name": "Kempegowda International Airport",
+  "division": "Bengaluru East",
+  "lat": 13.19863,
+  "lng": 77.70712,
+  "areaKm2": 16.08,
+  "distanceFromCentreKm": 27.44,
+  "zone": "outer"
+ }
+]

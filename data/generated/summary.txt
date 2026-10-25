@@ -1,0 +1,32 @@
+customers 10000, orders 27020
+channels {
+  'Online delivery': 18661,
+  'Store walk-in': 6292,
+  'Click & collect': 2067
+}
+categories {
+  Eyeglasses: 14157,
+  'Eye test': 3787,
+  Sunglasses: 3710,
+  'Contact lenses': 5366
+}
+revenue ₹ crore 6.97
+
+stores:
+ ST-01 Bengaluru          orders 2344  avg 4.94 km  p80 7.17 km  top: Bengaluru, Malleswaram, Basavanagudi
+ ST-02 Koramangala        orders 1744  avg 3.89 km  p80 5.64 km  top: HSR Layout, Koramangala, Bommanahalli
+ ST-03 Indiranagar        orders 1947  avg 4.42 km  p80 6.45 km  top: Indiranagar, C V Raman Nagar, Doorvaninagar
+ ST-04 Whitefield         orders 832  avg 4.29 km  p80 6.44 km  top: Whitefield, Vartur, Marathahalli Colony
+ ST-05 Bannerghatta Road  orders 1492  avg 4.33 km  p80 6.25 km  top: Bannerghatta Road, J P Nagar, Begur
+
+top 10 gaps (online orders, far from store):
+ 560037 Marathahalli Colony    online 528  share 70%  nearest ST-04 6.07 km
+ 560035 Carmelram              online 473  share 84%  nearest ST-02 8.12 km
+ 560098 Rajarajeshwarinagar    online 437  share 89%  nearest ST-05 9.4 km
+ 560061 Subramanyapura         online 425  share 79%  nearest ST-05 6.65 km
+ 560100 Electronics City       online 423  share 85%  nearest ST-05 8.01 km
+ 560113 Horamavu               online 422  share 77%  nearest ST-03 5.7 km
+ 560091 Viswaneedam            online 420  share 93%  nearest ST-01 11.71 km
+ 560092 Sahakaranagar          online 393  share 88%  nearest ST-01 8.74 km
+ 560103 Bellandur              online 382  share 78%  nearest ST-02 6.3 km
+ 560079 Basaveshwaranagar      online 366  share 78%  nearest ST-01 6.71 km

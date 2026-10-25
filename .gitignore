@@ -1,0 +1,10 @@
+node_modules
+dist
+.env*
+!.env.example
+.vercel
+hubspot-app/node_modules
+
+scratch/
+*.log
+hubspot-app/.hsaccount
