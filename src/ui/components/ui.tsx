@@ -57,7 +57,7 @@ export function Button({ variant = 'secondary', size = 'md', className, ...rest 
     <button
       {...rest}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
         size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm',
         variant === 'primary' && 'bg-brand-700 text-white hover:bg-brand-900',
         variant === 'secondary' && 'border border-line bg-white text-ink hover:bg-slate-50',

@@ -8,6 +8,10 @@ import { FILTERS, areaNames, compassLabel, matchesFilter, slotUnits, sortTerrito
 
 // Remembered while the app is open, so going back from a territory keeps the filter.
 let lastFilter: DecisionFilter = 'all';
+/** Preselect a filter before opening the list (used by the Overview buttons). */
+export const presetApplicationsFilter = (f: DecisionFilter) => {
+  lastFilter = f;
+};
 
 function SlotMeter({ filled, open }: { filled: number; open: number }) {
   if (open === 0) return <span className="text-xs text-muted" title="The brand has no open slots here this round">0 slots planned</span>;
@@ -202,7 +206,7 @@ export function TerritoryList() {
             className="w-full rounded-lg border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           />
         </div>
-        <div className="flex overflow-x-auto rounded-lg border border-line bg-white p-0.5 text-xs font-medium" role="tablist">
+        <div className="flex gap-4 overflow-x-auto text-sm" role="tablist">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -218,7 +222,7 @@ export function TerritoryList() {
                       ? 'The other four filters do not overlap and add up to this number'
                       : undefined
               }
-              className={cx('whitespace-nowrap rounded-md px-3 py-1.5', filter === f.id ? 'bg-brand-50 text-brand-700' : 'text-muted hover:text-ink')}
+              className={cx('whitespace-nowrap border-b-2 pb-1.5 pt-1', filter === f.id ? 'border-brand-600 font-medium text-ink' : 'border-transparent text-muted hover:text-ink')}
             >
               {f.label} <span className="tabular">{counts[f.id]}</span>
             </button>

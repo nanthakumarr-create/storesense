@@ -517,7 +517,7 @@ export function MapPage() {
       />
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="inline-flex w-full rounded-lg border border-line bg-white p-0.5 sm:w-auto" role="tablist">
+        <div className="flex gap-5 overflow-x-auto" role="tablist">
           {MODES.map((m) => (
             <button
               key={m.id}
@@ -526,8 +526,8 @@ export function MapPage() {
               disabled={!blr && m.id !== 'traffic'}
               onClick={() => changeMode(m.id)}
               className={cx(
-                'flex-1 rounded-md px-3 py-1.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:flex-none',
-                mode === m.id ? 'bg-brand-700 font-medium text-white' : 'text-muted hover:text-ink',
+                'whitespace-nowrap border-b-2 pb-1.5 pt-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40',
+                mode === m.id ? 'border-brand-600 font-medium text-ink' : 'border-transparent text-muted hover:text-ink',
               )}
             >
               {m.label}

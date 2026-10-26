@@ -3,7 +3,7 @@ import { MapPin } from 'lucide-react';
 import type { Application, Partnership, Result, Territory, TerritoryStatus } from '../../types';
 import { CONTRIBUTION_MARGIN, BUFFER_MONTHS, OVERLAP_PLACE_PENALTY, PARTNER_BAR, PAYBACK_TARGET_MONTHS, PLACE_WEIGHTS } from '../../config/rules';
 import { Button, DecisionBadge, cx, fmtDate, fmtKm, fmtLakh } from '../components/ui';
-import { Bar, KV, Section, SourceNote } from './parts';
+import { KV, Section, SourceNote } from './parts';
 import { annualRoiPct, combinedArithmetic, lakh2, mainDifference, months, motiveReading, n0, n1, pct, readinessParts, salesFormula } from './model';
 import { usePinPotential, type PinPotential } from './usePotential';
 
@@ -170,7 +170,6 @@ export function WhereSection({ r, terr, status, onMap }: { r: Result; terr: Terr
 export function MoneySection({ r, app }: { r: Result; app: Application | undefined }) {
   const e = r.economics;
   const have = app?.investmentLakh ?? null;
-  const scale = Math.max(e.totalCashNeedLakh, have ?? 0, 1);
   const sf = salesFormula(e.tier, e.floorFactor, e.monthlySalesLakh);
   const roi = annualRoiPct(r);
   const contribution = e.monthlySalesLakh * CONTRIBUTION_MARGIN;
@@ -186,9 +185,6 @@ export function MoneySection({ r, app }: { r: Result; app: Application | undefin
                 <span className="text-muted">Total cash needed</span>
                 <span className="tabular font-semibold text-ink">{lakh2(e.totalCashNeedLakh)}</span>
               </div>
-              <div className="mt-1">
-                <Bar value={e.totalCashNeedLakh} max={scale} tone="grey" />
-              </div>
               <p className="tabular mt-1 text-xs text-muted">
                 ₹{e.requiredInvestmentLakh} L investment + {lakh2(e.bufferLakh)} buffer ({BUFFER_MONTHS} months of fixed cost)
               </p>
@@ -197,9 +193,6 @@ export function MoneySection({ r, app }: { r: Result; app: Application | undefin
               <div className="flex items-baseline justify-between text-sm">
                 <span className="text-muted">They can invest</span>
                 <span className="tabular font-semibold text-ink">{have === null ? 'Not given' : `₹${have} L`}</span>
-              </div>
-              <div className="mt-1">
-                <Bar value={have ?? 0} max={scale} tone={short ? 'warn' : 'brand'} />
               </div>
             </div>
           </div>
@@ -237,15 +230,12 @@ export function MoneySection({ r, app }: { r: Result; app: Application | undefin
 }
 
 // ------------------------------------------------------------------ 5. Score
-function ScoreRow({ label, evidence, pts, weight, contrib, max = 100 }: { label: string; evidence: string; pts: number | null; weight: string; contrib: number | null; max?: number }) {
+function ScoreRow({ label, evidence, pts, weight, contrib }: { label: string; evidence: string; pts: number | null; weight: string; contrib: number | null }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 py-2.5 sm:grid-cols-[minmax(0,1fr)_64px_56px_72px]">
       <div className="min-w-0">
         <p className="text-sm text-ink">{label}</p>
         <p className="text-xs text-muted">{evidence}</p>
-        <div className="mt-1.5 max-w-[220px]">
-          <Bar value={pts ?? 0} max={max} tone="grey" />
-        </div>
       </div>
       <p className="tabular text-right text-sm text-ink sm:hidden">
         {pts === null ? '—' : n0(pts)} × {weight} = <span className="font-semibold">{contrib === null ? '—' : n1(contrib)}</span>
@@ -320,7 +310,7 @@ export function ScoreSection({ r, app }: { r: Result; app: Application | undefin
       <div className="mt-2">
         <div className="divide-y divide-line">
           {rd.rows.map((x) => (
-            <ScoreRow key={x.label} label={x.label} evidence={x.evidence} pts={x.pts} weight="—" contrib={x.pts} max={50} />
+            <ScoreRow key={x.label} label={x.label} evidence={x.evidence} pts={x.pts} weight="—" contrib={x.pts} />
           ))}
         </div>
         <Total label="Readiness" value={`${n0(r.readiness)} / 100`} />

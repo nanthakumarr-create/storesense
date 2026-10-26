@@ -130,7 +130,11 @@ export default function App() {
                 </Button>
               </div>
             )}
-            {status === 'ready' && PAGES[page]()}
+            {status === 'ready' && (
+              <div key={page} className="animate-[page-in_220ms_ease-out]">
+                {PAGES[page]()}
+              </div>
+            )}
           </div>
         </main>
       </div>

@@ -34,22 +34,21 @@ function Row({ label, value, strong }: { label: ReactNode; value: ReactNode; str
 const lakh = (v: number) => `₹${v.toFixed(2)}L`;
 const pct = (v: number) => `${Math.round(v)}%`;
 
-/** Load vs capacity bar; with `after` it shows before (light) and after (solid). */
+/** Load vs capacity as plain text ("62% of capacity", or "62% → 48%" with `after`); red at the heavy-lifter mark. */
 export function LoadBar({ load, capacity, after }: { load: number; capacity: number; after?: number }) {
-  const p = (v: number) => Math.min(100, (v / capacity) * 100);
-  const colour = (v: number) => (p(v) >= HEAVY_LIFTER_PCT ? 'bg-red-600' : 'bg-brand-600');
+  const p = (v: number) => Math.round((v / capacity) * 100);
+  const tone = (v: number) => (p(v) >= HEAVY_LIFTER_PCT ? 'font-medium text-decline' : 'text-ink');
   return (
-    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-100">
-      {after === undefined ? (
-        <div className={cx('h-full rounded-full', colour(load))} style={{ width: `${p(load)}%` }} />
-      ) : (
+    <p className="tabular text-xs text-muted">
+      <span className={tone(load)}>{p(load)}%</span>
+      {after !== undefined && (
         <>
-          <div className="absolute inset-y-0 left-0 rounded-full bg-gray-300" style={{ width: `${p(load)}%` }} />
-          <div className={cx('absolute inset-y-0 left-0 rounded-full', colour(after))} style={{ width: `${p(after)}%` }} />
+          {' → '}
+          <span className={tone(after)}>{p(after)}%</span>
         </>
-      )}
-      <div className="absolute inset-y-0 w-px bg-gray-500" style={{ left: `${HEAVY_LIFTER_PCT}%` }} title="75% of capacity" />
-    </div>
+      )}{' '}
+      of capacity
+    </p>
   );
 }
 
