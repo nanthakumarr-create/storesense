@@ -57,7 +57,7 @@ const isApproved = (r: Result) => r.decision === 'Approve' || r.decision === 'Ap
 const ll = (p: { lat: number; lng: number }): [number, number] => [p.lat, p.lng];
 
 export function MapPage() {
-  const { output, parse, ctx, routeParam, openApplicant, page } = useApp();
+  const { output, parse, ctx, routeParam, peekApplicant, page } = useApp();
   const [city, setCity] = useState<City>('Bengaluru');
   const [mode, setMode] = useState<Mode>('traffic');
   const [selStore, setSelStore] = useState<string | null>(null);
@@ -141,12 +141,18 @@ export function MapPage() {
   /* ---------- pin shading ---------- */
   const paint = useMemo<Record<string, PinPaint>>(() => {
     const out: Record<string, PinPaint> = {};
+    // The proxy has few distinct values per city (tier base, +10 near the centre), so they are stretched across the
+    // full ramp within the city: the lowest pin gets the lightest shade, the highest the darkest.
+    const proxy = !blr && ctx ? cityPins.map((p) => demandIndexFor(p.pin, ctx).index) : [];
+    const lo = proxy.length ? Math.min(...proxy) : 0;
+    const hi = proxy.length ? Math.max(...proxy) : 100;
+    const stretch = (d: number) => (hi > lo ? 30 + ((d - lo) / (hi - lo)) * 55 : 55);
     for (const p of cityPins) {
       const name = `${p.pin} ${p.name}`;
       const emphasis = p.pin === selPin;
       if (!blr) {
         const d = ctx ? demandIndexFor(p.pin, ctx).index : 0;
-        out[p.pin] = { fill: scaleColor(DEMAND_INDEX_SCALE, d), opacity: 0.6, emphasis, label: `${name} · demand proxy ${d}/100` };
+        out[p.pin] = { fill: scaleColor(DEMAND_INDEX_SCALE, stretch(d)), opacity: 0.8, emphasis, label: `${name} · demand proxy ${d}/100` };
         continue;
       }
       if (!flows) {
@@ -307,11 +313,11 @@ export function MapPage() {
               color: DECISION_STYLE[r.decision].hex,
               radius: 6,
               tooltip: `${who} · ${r.decision} · pin ${r.site}`,
-              onClick: () => openApplicant(r.uid),
+              onClick: () => peekApplicant(r.uid),
             };
           })
         : [],
-    [showApproved, approved, openApplicant],
+    [showApproved, approved, peekApplicant],
   );
 
   /* ---------- interactions ---------- */
@@ -413,7 +419,7 @@ export function MapPage() {
         pinDetail={otherCity.pinDetail}
         approved={approved}
         onPin={pickPin}
-        onOpenApplicant={openApplicant}
+        onOpenApplicant={peekApplicant}
       />
     ) : (
       <div className="p-6">
@@ -468,7 +474,7 @@ export function MapPage() {
             territoryLabel={planApplicants.territory}
             heldBy={planApplicants.heldBy}
             meta={flows.meta}
-            onOpenApplicant={openApplicant}
+            onOpenApplicant={peekApplicant}
             onClear={() => setSelPin(null)}
           />
         ) : selPin ? (
@@ -639,8 +645,8 @@ function Legend({ mode, isolated, planning, overlapKm }: { mode: Mode | 'proxy';
       )}
       {mode === 'proxy' && (
         <>
-          <p className="font-medium">Demand proxy (0-100)</p>
-          <Ramp scale={DEMAND_INDEX_SCALE} low="low" high="high" />
+          <p className="font-medium">Demand proxy, relative within this city</p>
+          <Ramp scale={DEMAND_INDEX_SCALE} low="lowest here" high="highest here" />
           <Key swatch={ring('#111827')}>Existing store</Key>
           <Key swatch={<span className="h-3 w-3 rounded-full border border-dashed border-gray-900 bg-gray-900/10" />}>{overlapKm} km overlap radius</Key>
         </>

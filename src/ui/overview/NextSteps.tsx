@@ -128,13 +128,25 @@ export function buildNextSteps(output: EngineOutput, h: Handlers): StepItem[] {
   }
 
   // 5. Territories where demand is high and strong partners are waiting.
+  // A territory with 0 open slots cannot use a higher priority, so it is worded as "add a slot" instead.
   const raise = output.territories.filter((t) => t.suggestRaisePriority);
   if (raise.length) {
+    const noSlots = raise.filter((t) => t.openSlots === 0);
+    const withSlots = raise.filter((t) => t.openSlots > 0);
+    const ids = (ts: typeof raise) => ts.map((t) => t.id).join(', ');
+    const title =
+      withSlots.length && noSlots.length
+        ? `Look at ${ids(withSlots)} (priority could be raised) and ${ids(noSlots)} (no open slots; consider adding one)`
+        : noSlots.length
+          ? `Consider adding a slot in ${ids(noSlots)}: no open slots, but strong applicants are waiting`
+          : `Look at ${ids(withSlots)}: priority could be raised`;
     items.push({
       key: 'raise',
       count: raise.length,
-      title: `Look at ${raise.map((t) => t.id).join(', ')}: priority could be raised`,
-      detail: 'Demand is high and strong applicants are waiting for a slot.',
+      title,
+      detail: noSlots.length
+        ? 'Demand is high and strong applicants are waiting. Where the brand planned 0 slots, nobody can be approved until the expansion head adds one.'
+        : 'Demand is high and strong applicants are waiting for a slot.',
       action: { label: `Open ${raise[0].id}`, run: () => h.openTerritory(raise[0].id) },
       rows: raise.map((t) => ({
         id: t.id,
@@ -143,7 +155,9 @@ export function buildNextSteps(output: EngineOutput, h: Handlers): StepItem[] {
             <span className="tabular font-medium">{t.id}</span> {t.city}
           </>
         ),
-        meta: `${t.priority} priority · ${t.filled.length} of ${t.openSlots} slots filled · ${t.contenders.length} waiting`,
+        meta: t.openSlots === 0
+          ? `${t.priority} priority · 0 slots planned (full, no winner needed) · ${t.contenders.length} waiting`
+          : `${t.priority} priority · ${t.filled.length} of ${t.openSlots} slots filled · ${t.contenders.length} waiting`,
         open: () => h.openTerritory(t.id),
       })),
     });

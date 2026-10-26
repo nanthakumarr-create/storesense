@@ -44,6 +44,7 @@ All numbers are assumptions to check against the 10 existing stores. Label them 
 
 **Demand proxy (no noise):**
 - demand = tier base (T1 70, T2 55, T3 45) + 10 if the pin is within 3 km of a hard-coded city centre.
+- Overlap radius: **2 km in every city** (was 2 / 3 / 5 km by tier), so the map and the rules use one number.
 - unservedNorm = 100 × min(1, distance to nearest store ÷ radius).
 - placeScore = 0.6 × unservedNorm + 0.4 × demand. Priority comes out of the place score; it only orders territories.
 - Label it "Demand proxy v1, replaced by order data per pin in the pilot."

@@ -9,7 +9,8 @@ export type DecisionFilter = 'all' | 'approved' | 'action' | 'waitlist' | 'decli
 export const FILTERS: { id: DecisionFilter; label: string; decisions: Decision[] | null }[] = [
   { id: 'all', label: 'All', decisions: null },
   { id: 'approved', label: 'Approved', decisions: ['Approve', 'Approve with conditions'] },
-  { id: 'action', label: 'Needs action', decisions: ['Hold', 'Approve with conditions', 'Redirect'] },
+  // Buckets do not overlap: conditional approvals count once, under Approved, so the counts add up to the file.
+  { id: 'action', label: 'Needs action', decisions: ['Hold', 'Redirect'] },
   { id: 'waitlist', label: 'Waitlist', decisions: ['Waitlist'] },
   { id: 'declined', label: 'Declined', decisions: ['Decline'] },
 ];

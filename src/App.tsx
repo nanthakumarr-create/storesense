@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Database, LayoutDashboard, Map as MapIcon, Menu, MessageSquare, Store, X, Rows3 } from 'lucide-react';
 import { useApp, type Page } from './state/AppState';
-import { cx, Spinner, Button } from './ui/components/ui';
+import { cx, Spinner, Button, fmtDate } from './ui/components/ui';
 import { AS_OF_DATE } from './config/rules';
 import { OverviewPage } from './ui/pages/OverviewPage';
 import { TerritoriesPage } from './ui/pages/TerritoriesPage';
@@ -9,6 +9,7 @@ import { ApplicantPage } from './ui/pages/ApplicantPage';
 import { MapPage } from './ui/pages/MapPage';
 import { AskPage } from './ui/pages/AskPage';
 import { DataPanel } from './ui/components/DataPanel';
+import { ApplicantDrawer } from './ui/applicant/ApplicantDrawer';
 
 const NAV: { page: Page; label: string; icon: ReactNode; activeOn?: Page[] }[] = [
   { page: 'overview', label: 'Overview', icon: <LayoutDashboard size={18} /> },
@@ -62,7 +63,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </ul>
       <div className="border-t border-line px-5 py-4 text-xs leading-relaxed text-muted">
         <p>StoreSense Eyewear (simulated brand)</p>
-        <p>Decisions as of {AS_OF_DATE}</p>
+        <p title="A fixed date, so the same file always gives the same decisions">Rules dated {fmtDate(AS_OF_DATE)}</p>
       </div>
     </nav>
   );
@@ -134,6 +135,7 @@ export default function App() {
         </main>
       </div>
       <DataPanel />
+      <ApplicantDrawer />
     </div>
   );
 }

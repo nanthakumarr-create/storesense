@@ -19,9 +19,9 @@ export function buildStages(output: EngineOutput): Stage[] {
   const inTerritory = results.filter((r) => r.territoryId).length;
   const outside = summary.total - inTerritory;
   const plans = results.filter((r) => r.launchPlan).length;
+  const approved = by.Approve + by['Approve with conditions'];
   const decidedLine = [
-    `${by.Approve} approve`,
-    `${by['Approve with conditions']} with conditions`,
+    `${approved} approved (${by.Approve} outright + ${by['Approve with conditions']} with conditions)`,
     `${by.Redirect} redirect`,
     `${by.Waitlist} waitlist`,
     `${by.Hold} hold`,
@@ -59,7 +59,10 @@ export function buildStages(output: EngineOutput): Stage[] {
       title: 'Onboarding',
       count: plans,
       unit: plans === 1 ? 'launch plan' : 'launch plans',
-      line: plans > 0 ? '60 to 90 day plans for approved partners. Starts when you confirm.' : 'No approved partners yet.',
+      line:
+        plans > 0
+          ? `60 to 90 day plans covering all ${approved} approved partners, outright and conditional. Starts when you confirm.`
+          : 'No approved partners yet.',
       done: false,
     },
   ];

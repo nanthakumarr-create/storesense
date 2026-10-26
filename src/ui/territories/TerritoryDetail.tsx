@@ -57,7 +57,7 @@ function Section({ title, subtitle, children }: { title: string; subtitle?: Reac
 }
 
 export function TerritoryDetail({ id }: { id: string }) {
-  const { output, parse, ctx, openTerritory, openApplicant, openMapAt } = useApp();
+  const { output, parse, ctx, openTerritory, peekApplicant, openMapAt } = useApp();
   const potential = usePotential();
   const t = output?.territories.find((x) => x.id === id);
   const terr = parse?.territories.find((x) => x.id === id);
@@ -195,7 +195,7 @@ export function TerritoryDetail({ id }: { id: string }) {
       >
         <Card className="overflow-hidden">
           {rows.length ? (
-            <ComparisonTable rows={rows} slots={t.openSlots} slotsUsed={units.length} onOpen={(uid) => openApplicant(uid)} />
+            <ComparisonTable rows={rows} slots={t.openSlots} slotsUsed={units.length} onOpen={(uid) => peekApplicant(uid)} />
           ) : (
             <EmptyState title="No one applied here yet" body="Target local retailers in these pin codes, especially optical and footwear shops." />
           )}
@@ -206,7 +206,7 @@ export function TerritoryDetail({ id }: { id: string }) {
             {redirectedIn.map((f, i) => (
               <span key={f.uid}>
                 {i > 0 && ', '}
-                <button onClick={() => openApplicant(f.uid)} className="text-brand-700 hover:underline">
+                <button onClick={() => peekApplicant(f.uid)} className="text-brand-700 hover:underline">
                   {f.name} ({f.appId})
                 </button>{' '}
                 at pin {f.pin}
@@ -224,7 +224,7 @@ export function TerritoryDetail({ id }: { id: string }) {
         title="Suggested partnerships"
         subtitle="Pairs an applicant with money but no experience with an experienced applicant who is short of money, so the store has both the funding and someone who can run it."
       >
-        <PartnershipCards pairs={pairs} onOpen={(uid) => openApplicant(uid)} />
+        <PartnershipCards pairs={pairs} onOpen={(uid) => peekApplicant(uid)} />
       </Section>
 
       <Section title="Why the slots went this way">

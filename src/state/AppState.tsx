@@ -45,6 +45,10 @@ interface AppState {
   /** Open an applicant's full page (null goes back to their territory). */
   openApplicant: (uid: string | null) => void;
   openTerritory: (territoryId: string | null) => void;
+  /** Applicant shown in the right-side drawer over the current page (null = closed). */
+  peekUid: string | null;
+  /** Open an applicant in the slide-out drawer without leaving the page (null closes it). */
+  peekApplicant: (uid: string | null) => void;
   /** Open the map focused on a pin (e.g. to see a new-store simulation there). */
   openMapAt: (pin: string | null) => void;
   /** Upload / HubSpot panel (replaces the old Data sources page). */
@@ -98,6 +102,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(routeFromHash);
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const [draftQuestion, setDraftQuestion] = useState<string | null>(null);
+  const [peekUid, setPeekUid] = useState<string | null>(null);
   const page = route.page;
   const selectedUid = route.page === 'applicant' ? route.param : null;
   const ctxRef = useRef<EngineContext | null>(null);
@@ -111,6 +116,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const setPage = useCallback((p: Page, param: string | null = null) => {
+    setPeekUid(null);
     window.location.hash = param ? `#/${p}/${encodeURIComponent(param)}` : `#/${p}`;
     setRoute({ page: p, param });
     document.querySelector('main')?.scrollTo({ top: 0 });
@@ -214,7 +220,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const value: AppState = {
     status, error, ctx, demandSource, parse, output, isSample, activity, page, routeParam: route.param, setPage,
-    selectedUid, openApplicant, openTerritory, openMapAt, dataPanelOpen, setDataPanelOpen,
+    selectedUid, openApplicant, openTerritory, peekUid, peekApplicant: setPeekUid, openMapAt, dataPanelOpen, setDataPanelOpen,
     loadFile, loadSample, updateApplication, resetUpdates, resultByUid, findResult,
     draftQuestion, setDraftQuestion,
   };

@@ -1,25 +1,26 @@
 // Overview: where this batch of applications is, and what the operator should do next. One calm screen, no charts.
 import { useMemo } from 'react';
 import { useApp } from '../../state/AppState';
-import { Button, Card, CardHeader, EmptyState, fmtInt } from '../components/ui';
+import { Button, Card, CardHeader, EmptyState, fmtDate, fmtInt } from '../components/ui';
 import { ProcessStages, buildStages } from '../overview/ProcessStages';
 import { NextSteps, buildNextSteps } from '../overview/NextSteps';
+import { DecisionFunnel } from '../overview/DecisionFunnel';
 
 export function OverviewPage() {
-  const { output, parse, demandSource, setPage, openApplicant, openTerritory, setDataPanelOpen, loadSample } = useApp();
+  const { output, parse, demandSource, setPage, peekApplicant, openTerritory, setDataPanelOpen, loadSample } = useApp();
 
   const stages = useMemo(() => (output ? buildStages(output) : []), [output]);
   const steps = useMemo(
     () =>
       output
         ? buildNextSteps(output, {
-            openApplicant: (uid) => openApplicant(uid),
+            openApplicant: (uid) => peekApplicant(uid),
             openTerritory: (id) => openTerritory(id),
             openApplications: () => setPage('territories'),
             openCrm: () => setDataPanelOpen(true),
           })
         : [],
-    [output, openApplicant, openTerritory, setPage, setDataPanelOpen],
+    [output, peekApplicant, openTerritory, setPage, setDataPanelOpen],
   );
 
   if (!output || !parse) {
@@ -79,6 +80,14 @@ export function OverviewPage() {
         <NextSteps items={steps} />
       </Card>
 
+      <Card>
+        <CardHeader
+          title="Decision funnel"
+          subtitle="Every application lands in exactly one outcome, so the bar always adds up to the file. Hover a segment for its count."
+        />
+        <DecisionFunnel output={output} applications={parse.applications} />
+      </Card>
+
       <div className="flex flex-col gap-1 px-1 text-xs text-muted sm:flex-row sm:flex-wrap sm:gap-x-6">
         <span>
           Slots filled{' '}
@@ -91,7 +100,7 @@ export function OverviewPage() {
           {storeCount === 1 ? 'store' : 'stores'} and every approval)
         </span>
         <span>{source}</span>
-        <span>Decisions as of {output.asOf}</span>
+        <span title="Every date calculation uses this fixed date, so the same file always gives the same decisions">Rules dated {fmtDate(output.asOf)} (fixed for repeatable results)</span>
       </div>
     </div>
   );

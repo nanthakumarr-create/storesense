@@ -65,7 +65,7 @@ function ApplicantList({ results, onOpen, empty }: { results: Result[]; onOpen: 
         <li key={r.uid}>
           <button className="flex w-full items-center justify-between gap-2 py-2 text-left hover:bg-gray-50" onClick={() => onOpen(r.uid)}>
             <span className="min-w-0">
-              <span className="block truncate text-sm text-ink">
+              <span className="block truncate text-sm text-ink" title={`${r.appId} · ${r.name}`}>
                 {r.appId} · {r.name}
               </span>
               <span className="block text-xs text-muted">
@@ -178,7 +178,7 @@ export function StorePanel({
           {feeding.slice(0, 8).map((f) => (
             <li key={f.pin}>
               <button className="flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50" onClick={() => onPin(f.pin)}>
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${f.pin} ${pinName(f.pin)}`}>
                   {f.pin} {pinName(f.pin)}
                 </span>
                 <span className="tabular shrink-0 text-muted">
@@ -285,7 +285,7 @@ export function LeaksPanel({ flows, selectedPin, onPin, onSimulate }: { flows: F
                 className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
                 onClick={() => onPin(p.pin)}
               >
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                   {p.pin} {p.name}
                 </span>
                 <span className="tabular shrink-0 text-muted">
@@ -315,7 +315,7 @@ export function BestPlaces({ selectedPin, onPick }: { selectedPin: string | null
               className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
               onClick={() => onPick(p.pin)}
             >
-              <span className="truncate text-ink">
+              <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                 <span className="tabular mr-2 text-muted">{i + 1}.</span>
                 {p.pin} {p.name}
               </span>
@@ -517,7 +517,7 @@ export function OtherCityPanel({
                 className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
                 onClick={() => onPin(p.pin)}
               >
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                   {p.pin} {p.name}
                 </span>
                 <span className="tabular shrink-0 text-muted">
