@@ -1148,7 +1148,7 @@ function buildResult(
     decision = 'Waitlist';
     codes.push(...e.codes);
     reasons.push(...e.why);
-    headline = `Waitlist (no territory yet): pin ${pinLbl(e.place)} is not in any territory; listed as a possible new territory.`;
+    headline = `Waitlist (no territory yet): pin code ${pinLbl(e.place)} is not in the target territories. They passed the partner and capital checks, so the pin is listed as a possible new territory.`;
     nextSteps.push(`Tell the partner by ${due(3)}: no open territory covers ${e.place.pin} yet; they are first in line if one opens.`, 'Expansion head reviews the pin in the gap list (D2).');
     whatWouldChange.push(`Adding ${e.place.pin} to a territory with an open slot, or the partner choosing a pin inside an open territory.`);
   } else if (f?.decision === 'Redirect' && f.redirect) {

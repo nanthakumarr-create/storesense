@@ -34,22 +34,21 @@ function Row({ label, value, strong }: { label: ReactNode; value: ReactNode; str
 const lakh = (v: number) => `₹${v.toFixed(2)}L`;
 const pct = (v: number) => `${Math.round(v)}%`;
 
-/** Load vs capacity bar; with `after` it shows before (light) and after (solid). */
+/** Load vs capacity as plain text ("62% of capacity", or "62% → 48%" with `after`); red at the heavy-lifter mark. */
 export function LoadBar({ load, capacity, after }: { load: number; capacity: number; after?: number }) {
-  const p = (v: number) => Math.min(100, (v / capacity) * 100);
-  const colour = (v: number) => (p(v) >= HEAVY_LIFTER_PCT ? 'bg-red-600' : 'bg-brand-600');
+  const p = (v: number) => Math.round((v / capacity) * 100);
+  const tone = (v: number) => (p(v) >= HEAVY_LIFTER_PCT ? 'font-medium text-decline' : 'text-ink');
   return (
-    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-100">
-      {after === undefined ? (
-        <div className={cx('h-full rounded-full', colour(load))} style={{ width: `${p(load)}%` }} />
-      ) : (
+    <p className="tabular text-xs text-muted">
+      <span className={tone(load)}>{p(load)}%</span>
+      {after !== undefined && (
         <>
-          <div className="absolute inset-y-0 left-0 rounded-full bg-gray-300" style={{ width: `${p(load)}%` }} />
-          <div className={cx('absolute inset-y-0 left-0 rounded-full', colour(after))} style={{ width: `${p(after)}%` }} />
+          {' → '}
+          <span className={tone(after)}>{p(after)}%</span>
         </>
-      )}
-      <div className="absolute inset-y-0 w-px bg-gray-500" style={{ left: `${HEAVY_LIFTER_PCT}%` }} title="75% of capacity" />
-    </div>
+      )}{' '}
+      of capacity
+    </p>
   );
 }
 
@@ -65,7 +64,7 @@ function ApplicantList({ results, onOpen, empty }: { results: Result[]; onOpen: 
         <li key={r.uid}>
           <button className="flex w-full items-center justify-between gap-2 py-2 text-left hover:bg-gray-50" onClick={() => onOpen(r.uid)}>
             <span className="min-w-0">
-              <span className="block truncate text-sm text-ink">
+              <span className="block truncate text-sm text-ink" title={`${r.appId} · ${r.name}`}>
                 {r.appId} · {r.name}
               </span>
               <span className="block text-xs text-muted">
@@ -178,7 +177,7 @@ export function StorePanel({
           {feeding.slice(0, 8).map((f) => (
             <li key={f.pin}>
               <button className="flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50" onClick={() => onPin(f.pin)}>
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${f.pin} ${pinName(f.pin)}`}>
                   {f.pin} {pinName(f.pin)}
                 </span>
                 <span className="tabular shrink-0 text-muted">
@@ -285,7 +284,7 @@ export function LeaksPanel({ flows, selectedPin, onPin, onSimulate }: { flows: F
                 className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
                 onClick={() => onPin(p.pin)}
               >
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                   {p.pin} {p.name}
                 </span>
                 <span className="tabular shrink-0 text-muted">
@@ -315,7 +314,7 @@ export function BestPlaces({ selectedPin, onPick }: { selectedPin: string | null
               className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
               onClick={() => onPick(p.pin)}
             >
-              <span className="truncate text-ink">
+              <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                 <span className="tabular mr-2 text-muted">{i + 1}.</span>
                 {p.pin} {p.name}
               </span>
@@ -517,7 +516,7 @@ export function OtherCityPanel({
                 className={cx('flex w-full items-baseline justify-between gap-2 py-1.5 text-left text-sm hover:bg-gray-50', p.pin === selectedPin && 'bg-brand-50')}
                 onClick={() => onPin(p.pin)}
               >
-                <span className="truncate text-ink">
+                <span className="truncate text-ink" title={`${p.pin} ${p.name}`}>
                   {p.pin} {p.name}
                 </span>
                 <span className="tabular shrink-0 text-muted">

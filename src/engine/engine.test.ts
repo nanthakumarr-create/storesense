@@ -139,7 +139,7 @@ describe('parser on the sample file', () => {
   it('throws a clear error for a file without an Applications sheet', () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['hello', 'world']]), 'Sheet1');
-    expect(() => parseWorkbook(toBuffer(wb), 'bad.xlsx')).toThrow(/No Applications sheet/);
+    expect(() => parseWorkbook(toBuffer(wb), 'bad.xlsx')).toThrow(/No applicant table/);
   });
 });
 

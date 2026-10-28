@@ -36,8 +36,9 @@ export const LANGUAGES = ['Kannada', 'English', 'Hindi'] as const;
 export const DEFAULT_LANGUAGE = 'English';
 
 // ---------- Place (demand + overlap) ----------
-/** Same pin as an existing or approved store is a hard block. Inside this radius is a catchment-check condition. */
-export const OVERLAP_RADIUS_KM: Record<Tier, number> = { 'Tier 1': 2, 'Tier 2': 3, 'Tier 3': 5 };
+/** Same pin as an existing or approved store is a hard block. Inside this radius is a catchment-check condition.
+ * One 2 km radius for every city, so the map and the rules read the same everywhere. */
+export const OVERLAP_RADIUS_KM: Record<Tier, number> = { 'Tier 1': 2, 'Tier 2': 2, 'Tier 3': 2 };
 /** Demand proxy for pins without order data: tier base + core-zone bonus. */
 export const DEMAND_PROXY_BASE: Record<Tier, number> = { 'Tier 1': 70, 'Tier 2': 55, 'Tier 3': 45 };
 export const DEMAND_PROXY_CORE_BONUS = 10;

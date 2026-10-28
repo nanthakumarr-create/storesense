@@ -1,26 +1,34 @@
 // Overview: where this batch of applications is, and what the operator should do next. One calm screen, no charts.
 import { useMemo } from 'react';
 import { useApp } from '../../state/AppState';
-import { Button, Card, CardHeader, EmptyState, fmtInt } from '../components/ui';
+import { Button, Card, CardHeader, EmptyState, fmtDate, fmtInt } from '../components/ui';
 import { ProcessStages, buildStages } from '../overview/ProcessStages';
 import { NextSteps, buildNextSteps } from '../overview/NextSteps';
+import { DecisionFunnel } from '../overview/DecisionFunnel';
+import { presetApplicationsFilter } from '../territories/TerritoryList';
+import type { DecisionFilter } from '../territories/helpers';
 
 export function OverviewPage() {
-  const { output, parse, demandSource, setPage, openApplicant, openTerritory, setDataPanelOpen, loadSample } = useApp();
+  const { output, parse, demandSource, setPage, peekApplicant, openTerritory, setDataPanelOpen, loadSample } = useApp();
 
   const stages = useMemo(() => (output ? buildStages(output) : []), [output]);
   const steps = useMemo(
     () =>
       output
         ? buildNextSteps(output, {
-            openApplicant: (uid) => openApplicant(uid),
+            openApplicant: (uid) => peekApplicant(uid),
             openTerritory: (id) => openTerritory(id),
             openApplications: () => setPage('territories'),
             openCrm: () => setDataPanelOpen(true),
           })
         : [],
-    [output, openApplicant, openTerritory, setPage, setDataPanelOpen],
+    [output, peekApplicant, openTerritory, setPage, setDataPanelOpen],
   );
+
+  const openList = (f: DecisionFilter) => {
+    presetApplicationsFilter(f);
+    setPage('territories');
+  };
 
   if (!output || !parse) {
     return (
@@ -70,7 +78,7 @@ export function OverviewPage() {
           subtitle="Every application goes through the same six steps. Select a step to see the applications."
         />
         <div className="p-2 sm:p-3">
-          <ProcessStages stages={stages} onOpen={() => setPage('territories')} />
+          <ProcessStages stages={stages} onOpen={(n) => openList(n === 2 ? 'action' : n === 5 || n === 6 ? 'approved' : 'all')} />
         </div>
       </Card>
 
@@ -79,19 +87,27 @@ export function OverviewPage() {
         <NextSteps items={steps} />
       </Card>
 
+      <Card>
+        <CardHeader
+          title="Decisions"
+          subtitle="Select a group to see who is in it."
+        />
+        <DecisionFunnel output={output} applications={parse.applications} onOpen={openList} />
+      </Card>
+
       <div className="flex flex-col gap-1 px-1 text-xs text-muted sm:flex-row sm:flex-wrap sm:gap-x-6">
-        <span>
+        <button className="text-left hover:text-ink hover:underline" onClick={() => openList('all')}>
           Slots filled{' '}
           <span className="tabular font-medium text-ink">
             {summary.slotsFilled} of {summary.slotsTotal}
           </span>
-        </span>
-        <span>
+        </button>
+        <button className="text-left hover:text-ink hover:underline" onClick={() => setPage('map')}>
           Pin conflicts <span className="tabular font-medium text-ink">{summary.pinConflicts}</span> (checked against {storeCount} existing{' '}
           {storeCount === 1 ? 'store' : 'stores'} and every approval)
-        </span>
+        </button>
         <span>{source}</span>
-        <span>Decisions as of {output.asOf}</span>
+        <span title="Every date calculation uses this fixed date, so the same file always gives the same decisions">Rules dated {fmtDate(output.asOf)} (fixed for repeatable results)</span>
       </div>
     </div>
   );

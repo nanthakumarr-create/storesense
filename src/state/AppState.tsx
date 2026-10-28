@@ -2,7 +2,8 @@
 // The engine is re-run from scratch on every change (it is fast and deterministic).
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Application, DecisionChange, EngineContext, EngineOutput, ParseResult, Result } from '../types';
-import { parseWorkbook } from '../engine/parse';
+import { parseWorkbookFrom } from '../engine/parse';
+import { filesLabel, filesToWorkbook, type InputFile } from '../engine/ingest';
 import { runAll } from '../engine';
 import { fetchSampleWorkbook, loadEngineContext, type DemandSourceInfo } from '../data/loaders';
 import { AS_OF_DATE } from '../config/rules';
@@ -45,12 +46,18 @@ interface AppState {
   /** Open an applicant's full page (null goes back to their territory). */
   openApplicant: (uid: string | null) => void;
   openTerritory: (territoryId: string | null) => void;
+  /** Applicant shown in the right-side drawer over the current page (null = closed). */
+  peekUid: string | null;
+  /** Open an applicant in the slide-out drawer without leaving the page (null closes it). */
+  peekApplicant: (uid: string | null) => void;
   /** Open the map focused on a pin (e.g. to see a new-store simulation there). */
   openMapAt: (pin: string | null) => void;
   /** Upload / HubSpot panel (replaces the old Data sources page). */
   dataPanelOpen: boolean;
   setDataPanelOpen: (open: boolean) => void;
   loadFile: (data: ArrayBuffer, fileName: string) => Promise<void>;
+  /** Load one or more files of any supported format (merged into one batch). */
+  loadFiles: (files: InputFile[]) => Promise<void>;
   loadSample: () => Promise<void>;
   /** Apply new information about one applicant, re-run, and report every decision that moved. */
   updateApplication: (uid: string, patch: Partial<Application>, sourceText: string) => UpdateOutcome;
@@ -98,9 +105,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [route, setRoute] = useState<Route>(routeFromHash);
   const [dataPanelOpen, setDataPanelOpen] = useState(false);
   const [draftQuestion, setDraftQuestion] = useState<string | null>(null);
+  const [peekUid, setPeekUid] = useState<string | null>(null);
   const page = route.page;
   const selectedUid = route.page === 'applicant' ? route.param : null;
   const ctxRef = useRef<EngineContext | null>(null);
+  // Read by loadFiles without making it change identity (the first-visit sample load depends on it).
+  const baseParseRef = useRef<ParseResult | null>(null);
+  baseParseRef.current = baseParse;
 
   const parse = useMemo(() => (baseParse ? applyPatches(baseParse, patches) : null), [baseParse, patches]);
   const output = useMemo(() => (parse && ctx ? runAll(parse, ctx) : null), [parse, ctx]);
@@ -111,6 +122,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   const setPage = useCallback((p: Page, param: string | null = null) => {
+    setPeekUid(null);
     window.location.hash = param ? `#/${p}/${encodeURIComponent(param)}` : `#/${p}`;
     setRoute({ page: p, param });
     document.querySelector('main')?.scrollTo({ top: 0 });
@@ -127,13 +139,28 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return c;
   }, []);
 
-  const loadFile = useCallback(
-    async (data: ArrayBuffer, fileName: string) => {
+  const loadFiles = useCallback(
+    async (files: InputFile[]) => {
+      const fileName = filesLabel(files);
       setStatus('loading');
       setError(null);
       try {
         await ensureCtx();
-        const p = parseWorkbook(data, fileName);
+        const { wb, notes } = await filesToWorkbook(files);
+        let p = parseWorkbookFrom(wb, fileName, notes);
+        // A file with applicants only (e.g. one CSV) keeps the territory plan already loaded, instead of
+        // waitlisting everyone for "no territory".
+        const prev = baseParseRef.current;
+        if (!p.territories.length && prev?.territories.length) {
+          p = {
+            ...p,
+            territories: prev.territories,
+            warnings: [
+              ...p.warnings.filter((w) => !/Territories sheet|no territory rows/.test(w)),
+              `No territory table in ${fileName}: kept the ${prev.territories.length} territories from ${prev.source.fileName}.`,
+            ],
+          };
+        }
         setBaseParse(p);
         setPatches({});
         setIsSample(fileName === 'StoreSense_Applicants_200.xlsx');
@@ -146,6 +173,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     },
     [ensureCtx],
   );
+  const loadFile = useCallback((data: ArrayBuffer, fileName: string) => loadFiles([{ name: fileName, data }]), [loadFiles]);
 
   const loadSample = useCallback(async () => {
     try {
@@ -214,8 +242,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
   const value: AppState = {
     status, error, ctx, demandSource, parse, output, isSample, activity, page, routeParam: route.param, setPage,
-    selectedUid, openApplicant, openTerritory, openMapAt, dataPanelOpen, setDataPanelOpen,
-    loadFile, loadSample, updateApplication, resetUpdates, resultByUid, findResult,
+    selectedUid, openApplicant, openTerritory, peekUid, peekApplicant: setPeekUid, openMapAt, dataPanelOpen, setDataPanelOpen,
+    loadFile, loadFiles, loadSample, updateApplication, resetUpdates, resultByUid, findResult,
     draftQuestion, setDraftQuestion,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

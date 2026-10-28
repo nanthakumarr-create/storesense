@@ -19,9 +19,9 @@ export function buildStages(output: EngineOutput): Stage[] {
   const inTerritory = results.filter((r) => r.territoryId).length;
   const outside = summary.total - inTerritory;
   const plans = results.filter((r) => r.launchPlan).length;
+  const approved = by.Approve + by['Approve with conditions'];
   const decidedLine = [
-    `${by.Approve} approve`,
-    `${by['Approve with conditions']} with conditions`,
+    `${approved} approved (${by.Approve} outright + ${by['Approve with conditions']} with conditions)`,
     `${by.Redirect} redirect`,
     `${by.Waitlist} waitlist`,
     `${by.Hold} hold`,
@@ -59,13 +59,16 @@ export function buildStages(output: EngineOutput): Stage[] {
       title: 'Onboarding',
       count: plans,
       unit: plans === 1 ? 'launch plan' : 'launch plans',
-      line: plans > 0 ? '60 to 90 day plans for approved partners. Starts when you confirm.' : 'No approved partners yet.',
+      line:
+        plans > 0
+          ? `60 to 90 day plans covering all ${approved} approved partners, outright and conditional. Starts when you confirm.`
+          : 'No approved partners yet.',
       done: false,
     },
   ];
 }
 
-export function ProcessStages({ stages, onOpen }: { stages: Stage[]; onOpen: () => void }) {
+export function ProcessStages({ stages, onOpen }: { stages: Stage[]; onOpen: (n: number) => void }) {
   return (
     <ol className="grid grid-cols-1 lg:grid-cols-6">
       {stages.map((s, i) => {
@@ -76,8 +79,8 @@ export function ProcessStages({ stages, onOpen }: { stages: Stage[]; onOpen: () 
             {!last && <span aria-hidden className="absolute left-6 top-9 -bottom-3 w-px bg-line lg:hidden" />}
             {!last && <span aria-hidden className="absolute left-9 -right-3 top-6 hidden h-px bg-line lg:block" />}
             <button
-              onClick={onOpen}
-              className="group relative flex w-full gap-3 rounded-lg p-3 text-left transition-colors hover:bg-gray-50 lg:flex-col lg:gap-2"
+              onClick={() => onOpen(s.n)}
+              className="group relative flex w-full gap-3 rounded-lg p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md active:translate-y-0 lg:flex-col lg:gap-2"
               aria-label={`${s.title}: ${s.count} ${s.unit}. Open applications`}
             >
               <span

@@ -2,15 +2,19 @@
 import { useMemo, useState } from 'react';
 import { ChevronRight, Search } from 'lucide-react';
 import { useApp } from '../../state/AppState';
-import type { Result } from '../../types';
-import { Card, DecisionBadge, EmptyState, PageHeader, cx } from '../components/ui';
+import type { Application, Partnership, Result } from '../../types';
+import { Card, DecisionBadge, EmptyState, PageHeader, cx, fmtLakh } from '../components/ui';
 import { FILTERS, areaNames, compassLabel, matchesFilter, slotUnits, sortTerritories, unitLabel, type DecisionFilter } from './helpers';
 
 // Remembered while the app is open, so going back from a territory keeps the filter.
 let lastFilter: DecisionFilter = 'all';
+/** Preselect a filter before opening the list (used by the Overview buttons). */
+export const presetApplicationsFilter = (f: DecisionFilter) => {
+  lastFilter = f;
+};
 
 function SlotMeter({ filled, open }: { filled: number; open: number }) {
-  if (open === 0) return <span className="text-xs text-muted">No open slots</span>;
+  if (open === 0) return <span className="text-xs text-muted" title="The brand has no open slots here this round">0 slots planned</span>;
   const used = Math.min(filled, open);
   return (
     <div className="w-full max-w-[120px]">
@@ -23,6 +27,45 @@ function SlotMeter({ filled, open }: { filled: number; open: number }) {
         <span className="font-medium text-ink">{used}</span> of {open} filled
       </p>
     </div>
+  );
+}
+
+const expLabel = (y: number | null | undefined) => (y === null || y === undefined ? 'experience not given' : y === 0 ? 'no retail experience' : `${y} yr${y === 1 ? '' : 's'} retail`);
+
+/** "2 partnerships" label that shows each pair on hover or focus, and says whether the pair holds a slot or is a backup. */
+function PartnershipHover({ pairs, appByUid }: { pairs: Partnership[]; appByUid: Map<string, Application> }) {
+  const won = pairs.filter((p) => p.status === 'allocated').length;
+  const label = `${pairs.length} partnership${pairs.length === 1 ? '' : 's'}${won ? ` (${won} won a slot)` : ' suggested'}`;
+  return (
+    <span className="group/pairs relative inline-block" tabIndex={0} onClick={(e) => e.stopPropagation()}>
+      <span className="cursor-help border-b border-dotted border-muted">{label}</span>
+      <span
+        role="tooltip"
+        className="invisible absolute left-0 top-full z-[600] mt-1.5 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-line bg-white p-3 text-left opacity-0 shadow-lg transition-opacity group-hover/pairs:visible group-hover/pairs:opacity-100 group-focus/pairs:visible group-focus/pairs:opacity-100"
+      >
+        <span className="mb-2 block text-xs text-muted">An experienced operator short of money, paired with an investor in the same territory.</span>
+        {pairs.map((p) => (
+          <span key={p.id} className="block border-t border-line py-2 first:border-t-0 first:pt-0 last:pb-0">
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-ink">
+                {p.operatorName} + {p.investorName}
+              </span>
+              <span className={cx('shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium', p.status === 'allocated' ? 'bg-brand-50 text-brand-700' : 'bg-slate-100 text-slate-600')}>
+                {p.status === 'allocated' ? 'Slot winner' : 'Backup, not in a slot'}
+              </span>
+            </span>
+            <span className="tabular mt-0.5 block text-xs text-muted">
+              Operator {p.operatorAppId}: {expLabel(appByUid.get(p.operatorUid)?.experienceYears)} · Investor {p.investorAppId}:{' '}
+              {expLabel(appByUid.get(p.investorUid)?.experienceYears)}
+            </span>
+            <span className="tabular block text-xs text-muted">
+              {fmtLakh(p.combinedInvestmentLakh)} together vs {fmtLakh(p.totalCashNeedLakh)} needed
+              {p.rankInTerritory ? ` · would rank #${p.rankInTerritory}` : ''}
+            </span>
+          </span>
+        ))}
+      </span>
+    </span>
   );
 }
 
@@ -69,7 +112,7 @@ function PeopleGroup({ title, note, people, onOpen }: { title: string; note: str
               <p className="truncate text-sm text-ink">
                 <span className="tabular font-medium">{r.appId}</span> · {r.name}
               </p>
-              <p className="truncate text-xs text-muted">{r.headline}</p>
+              <p className="truncate text-xs text-muted" title={r.headline}>{r.headline}</p>
             </div>
             <DecisionBadge decision={r.decision} />
           </button>
@@ -85,7 +128,7 @@ function PeopleGroup({ title, note, people, onOpen }: { title: string; note: str
 }
 
 export function TerritoryList() {
-  const { output, parse, openTerritory, openApplicant } = useApp();
+  const { output, parse, openTerritory, peekApplicant } = useApp();
   const [filter, setFilterState] = useState<DecisionFilter>(lastFilter);
   const [q, setQ] = useState('');
   const setFilter = (f: DecisionFilter) => {
@@ -96,6 +139,7 @@ export function TerritoryList() {
   const results = useMemo(() => output?.results ?? [], [output]);
   const partnerships = useMemo(() => output?.partnerships ?? [], [output]);
   const byUid = useMemo(() => new Map(results.map((r) => [r.uid, r])), [results]);
+  const appByUid = useMemo(() => new Map((parse?.applications ?? []).map((a) => [a.uid, a])), [parse]);
   const pinsById = useMemo(() => new Map((parse?.territories ?? []).map((t) => [t.id, t.pins])), [parse]);
 
   const rows = useMemo(() => {
@@ -107,7 +151,7 @@ export function TerritoryList() {
         const shown = applied.filter((r) => matchesFilter(r, filter));
         const areas = areaNames(pins, t.city);
         const dir = compassLabel(pins, t.city);
-        const pairs = partnerships.filter((p) => p.territoryId === t.id).length;
+        const pairs = partnerships.filter((p) => p.territoryId === t.id);
         const units = slotUnits(t, byUid);
         return { t, pins, applied, shown, areas, dir, pairs, units };
       })
@@ -162,15 +206,23 @@ export function TerritoryList() {
             className="w-full rounded-lg border border-line bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
           />
         </div>
-        <div className="flex overflow-x-auto rounded-lg border border-line bg-white p-0.5 text-xs font-medium" role="tablist">
+        <div className="flex gap-4 overflow-x-auto text-sm" role="tablist">
           {FILTERS.map((f) => (
             <button
               key={f.id}
               role="tab"
               aria-selected={filter === f.id}
               onClick={() => setFilter(f.id)}
-              title={f.id === 'action' ? 'On hold, approved with conditions, or redirected: someone has to follow up' : undefined}
-              className={cx('whitespace-nowrap rounded-md px-3 py-1.5', filter === f.id ? 'bg-brand-50 text-brand-700' : 'text-muted hover:text-ink')}
+              title={
+                f.id === 'action'
+                  ? 'On hold or redirected: someone has to follow up. Conditional approvals are counted under Approved only.'
+                  : f.id === 'approved'
+                    ? `${results.filter((r) => r.decision === 'Approve').length} outright + ${results.filter((r) => r.decision === 'Approve with conditions').length} with conditions`
+                    : f.id === 'all'
+                      ? 'The other four filters do not overlap and add up to this number'
+                      : undefined
+              }
+              className={cx('whitespace-nowrap border-b-2 pb-1.5 pt-1', filter === f.id ? 'border-brand-600 font-medium text-ink' : 'border-transparent text-muted hover:text-ink')}
             >
               {f.label} <span className="tabular">{counts[f.id]}</span>
             </button>
@@ -178,15 +230,15 @@ export function TerritoryList() {
         </div>
       </div>
 
-      <PersonSearch q={q} matches={people} onOpen={(uid) => openApplicant(uid)} />
+      <PersonSearch q={q} matches={people} onOpen={(uid) => peekApplicant(uid)} />
 
       {rows.length === 0 ? (
         <Card>
           <EmptyState title="No territory matches" body="Clear the search or choose another filter." />
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="hidden grid-cols-[minmax(0,2.2fr)_80px_140px_90px_minmax(0,1.6fr)_24px] gap-4 border-b border-line bg-slate-50 px-4 py-2 text-xs font-medium text-muted md:grid">
+        <Card>
+          <div className="hidden grid-cols-[minmax(0,2.2fr)_80px_140px_90px_minmax(0,1.6fr)_24px] gap-4 rounded-t-xl border-b border-line bg-slate-50 px-4 py-2 text-xs font-medium text-muted md:grid">
             <span>Territory</span>
             <span>Priority</span>
             <span>Slots</span>
@@ -203,9 +255,14 @@ export function TerritoryList() {
                       <span className="tabular font-semibold">{t.id}</span> · {t.city}
                       {dir ? ` ${dir}` : ''}
                     </p>
-                    <p className="truncate text-xs text-muted">
+                    <p className="text-xs text-muted">
                       {areas.length ? areas.join(', ') : 'Area names not available'} · {t.tier}
-                      {pairs > 0 && ` · ${pairs} suggested partnership${pairs === 1 ? '' : 's'}`}
+                      {pairs.length > 0 && (
+                        <>
+                          {' · '}
+                          <PartnershipHover pairs={pairs} appByUid={appByUid} />
+                        </>
+                      )}
                     </p>
                   </div>
                   <ChevronRight size={16} className="self-center text-muted md:hidden" />
@@ -214,15 +271,21 @@ export function TerritoryList() {
                       {t.priority} priority · {t.openSlots ? `${Math.min(units.length, t.openSlots)} of ${t.openSlots} slots filled` : 'no open slots'} ·{' '}
                       {filter === 'all' ? applied.length : `${shown.length} of ${applied.length}`} applicants
                     </p>
-                    <p className="truncate text-ink">{units.length ? `Won by ${units.map(unitLabel).join(', ')}` : 'No winner yet'}</p>
+                    <p className="text-ink">{units.length ? `Won by ${units.map(unitLabel).join(', ')}` : t.openSlots === 0 ? 'Full, no winner needed' : 'No winner yet'}</p>
                   </div>
                   <span className="hidden text-sm text-ink md:block">{t.priority}</span>
                   <div className="hidden md:block"><SlotMeter filled={units.length} open={t.openSlots} /></div>
                   <span className="tabular hidden text-right text-sm text-ink md:block">
                     {filter === 'all' ? applied.length : `${shown.length} of ${applied.length}`}
                   </span>
-                  <span className="hidden min-w-0 truncate text-sm text-ink md:block">
-                    {units.length ? units.map(unitLabel).join(', ') : <span className="text-muted">No winner yet</span>}
+                  <span className="hidden min-w-0 text-sm leading-snug text-ink md:block" title={units.length ? units.map(unitLabel).join(', ') : undefined}>
+                    {units.length ? (
+                      units.map(unitLabel).join(', ')
+                    ) : t.openSlots === 0 ? (
+                      <span className="text-muted">Full, no winner needed</span>
+                    ) : (
+                      <span className="text-muted">No winner yet</span>
+                    )}
                   </span>
                   <ChevronRight size={16} className="hidden text-muted md:block" />
                 </button>
@@ -234,11 +297,11 @@ export function TerritoryList() {
 
       <PeopleGroup
         title="Outside any territory"
-        note="Their pin code is not in the Territories sheet, so they cannot take a slot there. Open one to see where they were sent and why."
+        note="Their pin code is not in the target territories, so they cannot take a slot. The rule is the same for everyone: if they pass the partner and capital checks they are waitlisted (no territory yet) and the pin is listed as a possible new territory; if they fail those checks they are declined first."
         people={outside}
-        onOpen={(uid) => openApplicant(uid)}
+        onOpen={(uid) => peekApplicant(uid)}
       />
-      <PeopleGroup title="Data problems" note="The pin code could not be read. Ask the applicant to confirm it." people={problems} onOpen={(uid) => openApplicant(uid)} />
+      <PeopleGroup title="Data problems" note="The pin code could not be read. Ask the applicant to confirm it." people={problems} onOpen={(uid) => peekApplicant(uid)} />
     </div>
   );
 }

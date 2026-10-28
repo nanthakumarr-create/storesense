@@ -1,8 +1,8 @@
 // Generic Leaflet renderer for the store network map. All geometry is computed (and memoised) by the page;
 // this component only draws: pin shading, circles, flow lines, store markers, a planned store and approved franchises.
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import L from 'leaflet';
-import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
+import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import type { Feature, Geometry } from 'geojson';
 import type { PinInfo } from '../../types';
 import { CITY_CENTRE } from '../../config/rules';
@@ -75,7 +75,7 @@ interface Props {
   onStoreClick: (id: string) => void;
 }
 
-function storeIcon(s: StoreMarker): L.DivIcon {
+function storeIcon(s: StoreMarker, showCaption: boolean): L.DivIcon {
   const ring = s.heavy ? '#b91c1c' : '#1d4ed8';
   const pct = s.pct ?? 0;
   const bg = s.pct === null ? '#111827' : `conic-gradient(${ring} ${pct}%, #e5e7eb 0)`;
@@ -89,7 +89,7 @@ function storeIcon(s: StoreMarker): L.DivIcon {
       <div style="width:${s.size}px;height:${s.size}px;border-radius:9999px;background:${bg};${outline}display:flex;align-items:center;justify-content:center">
         <div style="width:${inner}px;height:${inner}px;border-radius:9999px;background:#111827;border:2px solid #fff"></div>
       </div>
-      <div style="position:absolute;top:${s.size + 2}px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11px Inter,system-ui,sans-serif;color:${s.heavy ? '#991b1b' : '#111827'};background:rgba(255,255,255,.92);padding:1px 5px;border-radius:4px;border:1px solid #e5e7eb">${s.caption}</div>
+      ${showCaption ? `<div style="position:absolute;top:${s.size + 2}px;left:50%;transform:translateX(-50%);white-space:nowrap;font:600 11px Inter,system-ui,sans-serif;color:${s.heavy ? '#991b1b' : '#111827'};background:rgba(255,255,255,.92);padding:1px 5px;border-radius:4px;border:1px solid #e5e7eb">${s.caption}</div>` : ''}
     </div>`,
   });
 }
@@ -115,6 +115,15 @@ function FitCity({ city, cityPins, fitTo }: { city: string; cityPins: PinInfo[];
   // fitTo is derived from the city; refit only when the city changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [city, cityPins, map]);
+  return null;
+}
+
+/** Store captions collide when the map is zoomed out; below this zoom only the selected store keeps its caption (hover still shows it). */
+const CAPTION_MIN_ZOOM = 12;
+
+function ZoomWatcher({ onZoom }: { onZoom: (z: number) => void }) {
+  const map = useMapEvents({ zoomend: () => onZoom(map.getZoom()) });
+  useEffect(() => onZoom(map.getZoom()), [map, onZoom]);
   return null;
 }
 
@@ -211,7 +220,8 @@ export function NetworkMap(props: Props) {
   const storeClick = useRef(props.onStoreClick);
   storeClick.current = props.onStoreClick;
 
-  const icons = useMemo(() => stores.map((s) => ({ s, icon: storeIcon(s) })), [stores]);
+  const [zoom, setZoom] = useState(11);
+  const icons = useMemo(() => stores.map((s) => ({ s, icon: storeIcon(s, s.selected || zoom >= CAPTION_MIN_ZOOM) })), [stores, zoom]);
 
   return (
     <MapContainer center={[centre.lat, centre.lng]} zoom={11} minZoom={7} maxZoom={17} scrollWheelZoom className="h-full w-full" zoomControl>
@@ -222,6 +232,7 @@ export function NetworkMap(props: Props) {
       />
       <FitCity city={city} cityPins={cityPins} fitTo={props.fitTo} />
       <FlyTo focus={focus} />
+      <ZoomWatcher onZoom={setZoom} />
       <ResizeWatcher />
 
       <Pane name="pins" style={{ zIndex: 350 }}>
