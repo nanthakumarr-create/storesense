@@ -1,4 +1,5 @@
-// Excel → typed records + data flags.
+// Workbook → typed records + data flags. Other formats (CSV, JSON, Word, PDF...) are turned into a workbook first
+// by ingest.ts, so they all get the same cleaning.
 // Contract: never throws on messy rows; flags them instead. Throws only when the file is not a workbook
 // or has no recognisable Applications sheet (message is shown to the user as-is).
 import * as XLSX from 'xlsx';
@@ -17,28 +18,28 @@ type TerrKey = 'id' | 'city' | 'state' | 'pins' | 'tier' | 'slots' | 'priority';
 type StoreKey = 'id' | 'city' | 'pin' | 'opened';
 
 const APP_COLS: Record<AppKey, (h: string) => boolean> = {
-  id: (h) => h === 'applicationid' || h === 'appid' || h === 'applicationno' || h === 'applicationnumber' || h === 'id',
-  name: (h) => h === 'applicantname' || h === 'name' || h === 'applicant' || h === 'fullname',
-  city: (h) => h === 'city',
-  state: (h) => h === 'state',
-  pin: (h) => h === 'pincode' || h === 'pin' || h === 'pincodes' || h === 'postalcode' || h === 'zip',
-  investment: (h) => h.startsWith('investment') || h.includes('capital'),
-  experience: (h) => h.includes('experience'),
-  business: (h) => h.includes('business'),
-  space: (h) => h === 'spaceavailable' || h === 'space' || h === 'spacestatus',
-  size: (h) => h.includes('spacesize') || h.includes('sqft') || h === 'size',
-  floor: (h) => h.startsWith('floor'),
-  launch: (h) => h.includes('launch'),
-  language: (h) => h.includes('language'),
-  notes: (h) => h.includes('note') || h.includes('comment'),
+  id: (h) => ['applicationid', 'appid', 'applicationno', 'applicationnumber', 'id', 'applicantid', 'leadid', 'refno', 'reference', 'referenceno', 'srno', 'sno', 'serialno', 'recordid'].includes(h),
+  name: (h) => ['applicantname', 'name', 'applicant', 'fullname', 'partnername', 'franchiseename', 'candidatename', 'contactname', 'ownername', 'leadname'].includes(h),
+  city: (h) => h === 'city' || h === 'town' || h === 'district' || h === 'citytown' || h === 'location',
+  state: (h) => h === 'state' || h === 'province',
+  pin: (h) => ['pincode', 'pin', 'pincodes', 'postalcode', 'zip', 'zipcode', 'postcode', 'pinno', 'areapin', 'proposedpin', 'proposedpincode'].includes(h),
+  investment: (h) => h.startsWith('investment') || h.includes('capital') || h.includes('budget') || h.includes('funds') || h.includes('networth') || h === 'invest',
+  experience: (h) => h.includes('experience') || h === 'exp' || h === 'expyears' || h === 'yearsinretail' || h === 'retailyears',
+  business: (h) => h.includes('business') || h.includes('occupation') || h.includes('profession'),
+  space: (h) => h === 'spaceavailable' || h === 'space' || h === 'spacestatus' || h === 'premises' || h === 'shopspace' || h === 'property' || h === 'site',
+  size: (h) => h.includes('spacesize') || h.includes('sqft') || h === 'size' || h.includes('area') || h.includes('squarefeet'),
+  floor: (h) => h.startsWith('floor') || h === 'level',
+  launch: (h) => h.includes('launch') || h.includes('timeline') || h.includes('openin') || h.includes('startin'),
+  language: (h) => h.includes('language') || h === 'lang',
+  notes: (h) => h.includes('note') || h.includes('comment') || h.includes('remark') || h.includes('message'),
 };
 const TERR_COLS: Record<TerrKey, (h: string) => boolean> = {
   id: (h) => h === 'territoryid' || h === 'territory' || h === 'id',
   city: (h) => h === 'city',
   state: (h) => h === 'state',
-  pins: (h) => h.includes('pincode') || h.includes('pins'),
+  pins: (h) => h.includes('pincode') || h.includes('pins') || h.includes('postalcodes') || h.includes('zipcodes'),
   tier: (h) => h.includes('tier'),
-  slots: (h) => h.includes('slot'),
+  slots: (h) => h.includes('slot') || h.includes('openings') || h.includes('target') || h.includes('storesplanned'),
   priority: (h) => h.includes('priority'),
 };
 const STORE_COLS: Record<StoreKey, (h: string) => boolean> = {
@@ -48,7 +49,9 @@ const STORE_COLS: Record<StoreKey, (h: string) => boolean> = {
   opened: (h) => h.startsWith('opened') || h.includes('year'),
 };
 const COLS: Record<Kind, Record<string, (h: string) => boolean>> = { apps: APP_COLS, terr: TERR_COLS, stores: STORE_COLS };
-const KEY_COL: Record<Kind, string> = { apps: 'id', terr: 'pins', stores: 'id' };
+const KEY_COL: Record<Kind, string[]> = { apps: ['id', 'name'], terr: ['pins'], stores: ['id'] };
+/** How far down a sheet to look for the header row (PDFs and exports often start with a title block). */
+const HEADER_SCAN_ROWS = 30;
 
 function mapHeader(row: Row, kind: Kind): Record<string, number> {
   const out: Record<string, number> = {};
@@ -70,11 +73,11 @@ function mapHeader(row: Row, kind: Kind): Record<string, number> {
 
 function findHeader(rows: Row[], kind: Kind): { index: number; map: Record<string, number>; score: number } | null {
   let best: { index: number; map: Record<string, number>; score: number } | null = null;
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
+  for (let i = 0; i < Math.min(HEADER_SCAN_ROWS, rows.length); i++) {
     const map = mapHeader(rows[i] ?? [], kind);
     const score = Object.keys(map).length;
     const needed = kind === 'stores' ? 2 : 3;
-    if (score >= needed && map[KEY_COL[kind]] !== undefined && (!best || score > best.score)) best = { index: i, map, score };
+    if (score >= needed && KEY_COL[kind].some((k) => map[k] !== undefined) && (!best || score > best.score)) best = { index: i, map, score };
   }
   // Applications sheets are distinguished from others by the investment / experience columns.
   if (best && kind === 'apps' && best.map.investment === undefined && best.map.experience === undefined && best.map.pin === undefined) return null;
@@ -94,7 +97,7 @@ function rowsOf(ws: XLSX.WorkSheet): Row[] {
   return XLSX.utils.sheet_to_json<Row>(ws, { header: 1, raw: true, defval: null, blankrows: true });
 }
 
-function pickSheet(wb: XLSX.WorkBook, kind: Kind, used: Set<string>): { name: string; rows: Row[]; header: { index: number; map: Record<string, number> } } | null {
+function pickSheet(wb: XLSX.WorkBook, kind: Kind, used: Set<string>): { name: string; rows: Row[]; header: { index: number; map: Record<string, number>; score: number } } | null {
   const byName = wb.SheetNames.filter((n) => !used.has(n) && SHEET_NAME[kind](norm(n)));
   for (const n of byName) {
     const rows = rowsOf(wb.Sheets[n]);
@@ -225,17 +228,60 @@ export function parseWorkbook(data: ArrayBuffer, fileName: string): ParseResult 
   } catch {
     throw new Error(`"${fileName}" could not be read as an Excel or CSV file. Please upload the .xlsx template.`);
   }
-  if (!wb.SheetNames.length) throw new Error(`"${fileName}" has no sheets.`);
-  const warnings: string[] = [];
+  return parseWorkbookFrom(wb, fileName);
+}
+
+const KINDS: Kind[] = ['apps', 'terr', 'stores'];
+
+/**
+ * A sheet that holds more than one table (a PDF or Word page with Applications and Territories one after the
+ * other, or a single CSV with both) is split at each header row, so each table is found on its own.
+ */
+function splitStackedTables(wb: XLSX.WorkBook): XLSX.WorkBook {
+  const out = XLSX.utils.book_new();
+  for (const name of wb.SheetNames) {
+    const rows = rowsOf(wb.Sheets[name]);
+    const starts: { at: number; kind: Kind }[] = [];
+    rows.forEach((row, i) => {
+      const kind = KINDS.find((k) => findHeader([row], k));
+      if (kind && !starts.some((s) => s.kind === kind)) starts.push({ at: i, kind });
+    });
+    if (starts.length < 2) {
+      XLSX.utils.book_append_sheet(out, wb.Sheets[name], name);
+      continue;
+    }
+    const label: Record<Kind, string> = { apps: 'Applications', terr: 'Territories', stores: 'Existing stores' };
+    starts.forEach((s, j) => {
+      let end = j + 1 < starts.length ? starts[j + 1].at : rows.length;
+      // Drop blank lines and one-cell title lines ("TERRITORIES — ONE ROW PER RECORD") that sit before the next table.
+      while (end > s.at + 1 && (rows[end - 1] ?? []).filter((c) => !isBlank(c)).length <= 1) end--;
+      const sheet = `${label[s.kind]} (${name})`.slice(0, 31);
+      if (!out.SheetNames.includes(sheet)) XLSX.utils.book_append_sheet(out, XLSX.utils.aoa_to_sheet(rows.slice(s.at, end)), sheet);
+    });
+  }
+  return out;
+}
+
+/** Parse an already-built workbook (from any file format, see ingest.ts). `notes` are added to the file warnings. */
+export function parseWorkbookFrom(input: XLSX.WorkBook, fileName: string, notes: string[] = []): ParseResult {
+  if (!input.SheetNames.length) throw new Error(`"${fileName}" has no sheets.`);
+  const wb = splitStackedTables(input);
+  const warnings: string[] = [...notes];
   const used = new Set<string>();
 
   const appsSheet = pickSheet(wb, 'apps', used);
   if (!appsSheet)
     throw new Error(
-      `No Applications sheet found in "${fileName}". The file needs a sheet with the columns Application ID, Applicant name, City, Pin code, Investment capacity (₹ lakh) and so on, as in the template.`,
+      `No applicant table found in "${fileName}". It needs a header row with columns such as Applicant name (or Application ID), City, Pin code, Investment capacity and Retail experience. Any file type works as long as the table has those headings.`,
     );
   used.add(appsSheet.name);
   if (!SHEET_NAME.apps(norm(appsSheet.name))) warnings.push(`No sheet called "Applications"; used "${appsSheet.name}" because its columns match.`);
+  // More applicant tables (a second file, or applicants split over several sheets) are added to the same batch.
+  const moreApps: NonNullable<ReturnType<typeof pickSheet>>[] = [];
+  for (let extra = pickSheet(wb, 'apps', used); extra && extra.header.score >= 4; extra = pickSheet(wb, 'apps', used)) {
+    used.add(extra.name);
+    moreApps.push(extra);
+  }
 
   const terrSheet = pickSheet(wb, 'terr', used);
   if (terrSheet) used.add(terrSheet.name);
@@ -247,12 +293,13 @@ export function parseWorkbook(data: ArrayBuffer, fileName: string): ParseResult 
   let exampleRowDropped = false;
   let blankRowsSkipped = 0;
   const applications: Application[] = [];
-  {
-    const { rows, header } = appsSheet;
+  const seen = new Map<string, number>();
+  for (const sheet of [appsSheet, ...moreApps]) {
+    const { rows, header } = sheet;
     const map = header.map as Record<AppKey, number>;
     const get = (row: Row, k: AppKey) => (map[k] === undefined ? null : row[map[k]]);
     let firstData = true;
-    const seen = new Map<string, number>();
+    const before = applications.length;
     // trailing blank rows are not "skipped rows"
     let last = rows.length - 1;
     while (last > header.index && rowIsBlank(rows[last])) last--;
@@ -270,8 +317,12 @@ export function parseWorkbook(data: ArrayBuffer, fileName: string): ParseResult 
           continue;
         }
       }
-      applications.push(parseApplication(row, rowNumber, get, seen));
+      const app = parseApplication(row, rowNumber, get, seen);
+      // Same ID on the same row number in two files: keep both, with the sheet name in the internal key.
+      if (applications.some((a) => a.uid === app.uid)) app.uid = `${app.uid}@${sheet.name}`;
+      applications.push(app);
     }
+    if (sheet !== appsSheet) warnings.push(`Added ${applications.length - before} applicants from "${sheet.name}".`);
     // later duplicates get a unique uid
     if (exampleRowDropped) warnings.push(`Row ${header.index + 2} is the untouched template example (APP-001 Ravi Kumar) and was ignored.`);
   }

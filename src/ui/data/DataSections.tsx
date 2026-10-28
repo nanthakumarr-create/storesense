@@ -5,6 +5,7 @@ import { useApp } from '../../state/AppState';
 import { DECISIONS, type Decision, type Tier } from '../../types';
 import { Button, DECISION_STYLE, cx, fmtDate, fmtInt } from '../components/ui';
 import { hubspotStatus, importFromHubSpot, pushToHubSpot, type HubSpotStatus } from '../../data/hubspot';
+import { ACCEPTED_FORMATS } from '../../engine/ingest';
 import {
   BUFFER_MONTHS,
   CAPITAL_GAP,
@@ -74,10 +75,9 @@ function Collapsible({ label, children }: { label: string; children: ReactNode }
 
 // ---------------------------------------------------------------- 1. applications source
 
-const ACCEPT = /\.(xlsx|xls)$/i;
 
 export function ApplicationsSource({ onDone }: { onDone: () => void }) {
-  const { parse, output, status, error, isSample, loadFile, loadSample } = useApp();
+  const { parse, output, status, error, isSample, loadFiles, loadSample } = useApp();
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState<null | 'file' | 'sample'>(null);
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
@@ -94,28 +94,27 @@ export function ApplicationsSource({ onDone }: { onDone: () => void }) {
     else if (parse) setMsg({ tone: 'good', text: `Loaded ${parse.source.fileName}: ${parse.applications.length} applications, ${parse.territories.length} territories. Every decision has been re-run.` });
   }, [status, error, parse]);
 
-  const readFile = async (f: File | undefined) => {
-    if (!f) return;
-    if (!ACCEPT.test(f.name)) {
-      setMsg({ tone: 'bad', text: `${f.name} is not an Excel file. Upload a .xlsx or .xls file in the template layout.` });
-      return;
-    }
+  const readFiles = async (list: FileList | null | undefined) => {
+    const picked = Array.from(list ?? []);
+    if (!picked.length) return;
+    const label = picked.length === 1 ? picked[0].name : `${picked.length} files`;
     setMsg(null);
     setBusy('file');
-    pending.current = f.name;
+    pending.current = label;
     try {
-      await loadFile(await f.arrayBuffer(), f.name);
+      const files = await Promise.all(picked.map(async (f) => ({ name: f.name, data: await f.arrayBuffer() })));
+      await loadFiles(files);
     } catch (e) {
       pending.current = null;
       setBusy(null);
-      setMsg({ tone: 'bad', text: `Could not read ${f.name}: ${e instanceof Error ? e.message : String(e)}` });
+      setMsg({ tone: 'bad', text: `Could not read ${label}: ${e instanceof Error ? e.message : String(e)}` });
     }
   };
 
   const onDrop = (e: DragEvent) => {
     e.preventDefault();
     setDrag(false);
-    void readFile(e.dataTransfer.files?.[0]);
+    void readFiles(e.dataTransfer.files);
   };
 
   const loadSampleData = async () => {
@@ -129,7 +128,7 @@ export function ApplicationsSource({ onDone }: { onDone: () => void }) {
   const warnings = parse?.warnings ?? [];
 
   return (
-    <PanelSection title="Applications source" subtitle="The Excel file the decisions are built from (Applications + Territories sheets).">
+    <PanelSection title="Applications source" subtitle="The file the decisions are built from. Any format with an applicant table works; territories can be in the same file or a second one.">
       {parse ? (
         <Rows
           rows={[
@@ -181,22 +180,23 @@ export function ApplicationsSource({ onDone }: { onDone: () => void }) {
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && inputRef.current?.click()}
         role="button"
         tabIndex={0}
-        aria-label="Upload an Excel file"
+        aria-label="Upload files"
         className={cx(
           'mt-4 flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed px-4 py-6 text-center transition-colors',
           drag ? 'border-brand-600 bg-brand-50' : 'border-gray-300 bg-white hover:border-brand-600',
         )}
       >
         <Upload size={18} className="text-muted" />
-        <p className="text-sm font-medium text-ink">{busy === 'file' ? 'Reading the file…' : 'Upload Excel file'}</p>
-        <p className="text-xs text-muted">Drag a .xlsx or .xls here, or click to choose. Replaces the current file.</p>
+        <p className="text-sm font-medium text-ink">{busy === 'file' ? 'Reading…' : 'Upload files'}</p>
+        <p className="text-xs text-muted">Drag files here or click to choose. You can pick several at once (e.g. applicants + territories).</p>
+        <p className="text-[11px] text-muted">{ACCEPTED_FORMATS}</p>
         <input
           ref={inputRef}
           type="file"
-          accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+          multiple
           className="hidden"
           onChange={(e) => {
-            void readFile(e.target.files?.[0]);
+            void readFiles(e.target.files);
             e.target.value = '';
           }}
         />
